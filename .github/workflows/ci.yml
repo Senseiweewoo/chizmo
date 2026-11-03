@@ -54,6 +54,14 @@ jobs:
         env:
           DATABASE_URL: "postgresql://chizmo_user:chizmo_password@localhost:5432/chizmo_db?schema=public"
 
+      - name: Build Packages
+        run: |
+          npm run build --workspace=@chizmo/core
+          npm run build --workspace=@chizmo/db
+          npm run build --workspace=@chizmo/ai
+        env:
+          DATABASE_URL: "postgresql://chizmo_user:chizmo_password@localhost:5432/chizmo_db?schema=public"
+
       - name: Run Typechecks
         run: npm run typecheck
 
