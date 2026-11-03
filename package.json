@@ -9,10 +9,11 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspaces --if-present",
+    "build:packages": "npm run build --workspace=@chizmo/core && npm run build --workspace=@chizmo/db && npm run build --workspace=@chizmo/ai",
+    "build": "npm run build:packages && npm run build --workspace=@chizmo/realtime && npm run build --workspace=@chizmo/worker && npm run build --workspace=@chizmo/web",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate --workspace=packages/db",
     "db:push": "npm run push --workspace=packages/db",
     "db:seed": "npm run seed --workspace=packages/db"
