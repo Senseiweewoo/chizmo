@@ -1,0 +1,35 @@
+{
+  "name": "chizmo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chizmo - AI-Powered Spaced Repetition Study Platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=packages/db",
+    "db:push": "npm run push --workspace=packages/db",
+    "db:seed": "npm run seed --workspace=packages/db"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.1",
+    "typescript": "^5.7.3"
+  },
+  "keywords": [
+    "study",
+    "flashcards",
+    "fsrs",
+    "spaced-repetition",
+    "ai",
+    "quiz",
+    "gamification"
+  ],
+  "author": "Senseiweewoo",
+  "license": "MIT"
+}
