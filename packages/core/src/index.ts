@@ -12,4 +12,5 @@ export * from './ingestion/text-cleaner.js';
 export * from './ingestion/delimited-parser.js';
 export * from './ingestion/youtube-parser.js';
 export * from './safety/crisis-detector.js';
+export * from './safety/profanity-filter.js';
 export { z } from 'zod';

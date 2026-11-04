@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { detectCrisisIntent, VERIFIED_CRISIS_HOTLINES } from '../safety/crisis-detector.js';
+import { isCleanNickname, sanitizeNickname } from '../safety/profanity-filter.js';
 
 describe('Safety & Crisis Detector Tests', () => {
   it('1. Detects clear crisis statements and provides hotlines', () => {
@@ -26,5 +27,16 @@ describe('Safety & Crisis Detector Tests', () => {
       assert.ok(h.contact.length > 0);
       assert.ok(h.detail.length > 0);
     }
+  });
+
+  it('4. Filters profanity in student multiplayer handles', () => {
+    assert.equal(isCleanNickname('QuantumScholar'), true);
+    assert.equal(isCleanNickname('ChizzyFan99'), true);
+
+    const cleanHandle = sanitizeNickname('AlexBio');
+    assert.equal(cleanHandle, 'AlexBio');
+
+    const sanitizedBad = sanitizeNickname('badword_asshole');
+    assert.ok(sanitizedBad.includes('Chizzy Scholar'));
   });
 });
