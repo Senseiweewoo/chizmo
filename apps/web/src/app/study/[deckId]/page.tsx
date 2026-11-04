@@ -67,6 +67,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
   const [canUndo, setCanUndo] = useState(false);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/study/${deckId}/queue`)
       .then((res) => res.json())
       .then((data) => {

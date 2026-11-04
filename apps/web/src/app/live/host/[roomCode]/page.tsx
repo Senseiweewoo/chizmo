@@ -57,7 +57,7 @@ const CHOICE_SHAPES = ['▲', '◆', '●', '■'];
 
 export default function HostLiveRoomPage({ params }: { params: Promise<{ roomCode: string }> }) {
   const resolvedParams = use(params);
-  const roomCode = resolvedParams.roomCode.toUpperCase();
+  const roomCode = resolvedParams?.roomCode ? resolvedParams.roomCode.toUpperCase() : '';
 
   const [room, setRoom] = useState<RoomData | null>(null);
   const [timeLeft, setTimeLeft] = useState(15);

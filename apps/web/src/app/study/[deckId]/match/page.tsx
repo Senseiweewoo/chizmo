@@ -41,6 +41,7 @@ export default function MatchModePage({ params }: { params: Promise<{ deckId: st
   const isComplete = tiles.length > 0 && matchedCount === tiles.length;
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/study/${deckId}/queue`)
       .then((res) => res.json())
       .then((data) => {

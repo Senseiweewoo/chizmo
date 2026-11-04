@@ -52,7 +52,7 @@ const CHOICE_BUTTONS = [
 
 export default function PlayerControllerPage({ params }: { params: Promise<{ roomCode: string }> }) {
   const resolvedParams = use(params);
-  const roomCode = resolvedParams.roomCode.toUpperCase();
+  const roomCode = resolvedParams?.roomCode ? resolvedParams.roomCode.toUpperCase() : '';
 
   const [player, setPlayer] = useState<PlayerState | null>(null);
   const [room, setRoom] = useState<RoomData | null>(null);

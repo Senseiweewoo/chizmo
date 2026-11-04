@@ -48,6 +48,7 @@ export default function QuizModePage({ params }: { params: Promise<{ deckId: str
   const [timerActive, setTimerActive] = useState(false);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/study/${deckId}/queue`)
       .then((res) => res.json())
       .then((data) => {

@@ -43,6 +43,7 @@ export default function WriteModePage({ params }: { params: Promise<{ deckId: st
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/study/${deckId}/queue`)
       .then((res) => res.json())
       .then((data) => {

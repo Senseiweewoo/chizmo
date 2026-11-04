@@ -54,6 +54,7 @@ export default function SocraticTutorPage({ params }: { params: Promise<{ deckId
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/decks/${deckId}/cards`)
       .then((res) => res.json())
       .then((data) => {

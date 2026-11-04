@@ -49,6 +49,7 @@ export default function DeckSummaryPage({ params }: { params: Promise<{ deckId: 
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch('/api/ai/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

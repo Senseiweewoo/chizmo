@@ -82,4 +82,5 @@ jobs:
           DATABASE_URL: "postgresql://chizmo_user:chizmo_password@localhost:5432/chizmo_db?schema=public"
           JWT_SECRET: "chizmo-super-secure-default-jwt-secret-key-32-chars"
           NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          NEXT_TELEMETRY_DISABLED: "1"
           NODE_OPTIONS: "--max-old-space-size=4096"

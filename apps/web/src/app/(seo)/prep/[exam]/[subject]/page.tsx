@@ -161,7 +161,9 @@ export async function generateMetadata({
   params: Promise<{ exam: string; subject: string }>;
 }): Promise<Metadata> {
   const resolved = await params;
-  const data = PREP_DATABASE[resolved.exam.toLowerCase()]?.[resolved.subject.toLowerCase()];
+  const exam = resolved?.exam?.toLowerCase();
+  const subject = resolved?.subject?.toLowerCase();
+  const data = exam && subject ? PREP_DATABASE[exam]?.[subject] : undefined;
   if (!data) {
     return { title: 'Study Deck | Chizmo' };
   }
@@ -183,7 +185,9 @@ export default async function ExamSubjectLandingPage({
   params: Promise<{ exam: string; subject: string }>;
 }) {
   const resolved = await params;
-  const data = PREP_DATABASE[resolved.exam.toLowerCase()]?.[resolved.subject.toLowerCase()];
+  const exam = resolved?.exam?.toLowerCase();
+  const subject = resolved?.subject?.toLowerCase();
+  const data = exam && subject ? PREP_DATABASE[exam]?.[subject] : undefined;
 
   if (!data) {
     notFound();

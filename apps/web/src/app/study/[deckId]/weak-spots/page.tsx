@@ -64,6 +64,7 @@ export default function WeakSpotsStudyPage({ params }: { params: Promise<{ deckI
 
   // Fetch weak spots
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/study/weak-spots?deckId=${deckId}`)
       .then((res) => res.json())
       .then((data) => {

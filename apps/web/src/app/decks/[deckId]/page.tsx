@@ -82,6 +82,7 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/decks/${deckId}`)
       .then((res) => res.json())
       .then((data) => {

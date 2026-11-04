@@ -63,6 +63,7 @@ export default function MockTestPage({ params }: { params: Promise<{ deckId: str
 
   // Fetch deck cards and generate test questions
   useEffect(() => {
+    if (!deckId) return;
     fetch(`/api/decks/${deckId}/cards`)
       .then((res) => res.json())
       .then((data) => {
