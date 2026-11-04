@@ -66,6 +66,50 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
   // Undo stack
   const [canUndo, setCanUndo] = useState(false);
 
+  // Guest claim account state
+  const [isGuest, setIsGuest] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupDisplayName, setSignupDisplayName] = useState('');
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [accountSavedSuccess, setAccountSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated && data.user?.isGuest) {
+          setIsGuest(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleClaimAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingAccount(true);
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: signupEmail,
+          password: signupPassword,
+          displayName: signupDisplayName || 'Scholar',
+          birthYear: 2008,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsGuest(false);
+        setAccountSavedSuccess(true);
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+      }
+    } finally {
+      setIsSavingAccount(false);
+    }
+  };
+
   useEffect(() => {
     if (!deckId) return;
     fetch(`/api/study/${deckId}/queue`)
@@ -248,6 +292,66 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
           <Flame className="w-4 h-4 fill-amber-500 text-amber-500" />
           Study streak extended! Next reviews scheduled automatically.
         </div>
+
+        {/* Guest Progress Claim Prompt */}
+        {isGuest && !accountSavedSuccess && (
+          <div className="bg-gradient-to-r from-chizmo-600/10 via-volt-500/10 to-indigo-600/10 border-2 border-chizmo-500/30 rounded-3xl p-6 text-left space-y-4 shadow-sm animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">🔥</span>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Save your progress & claim your 1-day study streak!
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  You are currently studying as a guest. Save your account to keep your decks, FSRS intervals, and XP.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleClaimAccount} className="space-y-3">
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <input
+                  type="text"
+                  required
+                  value={signupDisplayName}
+                  onChange={(e) => setSignupDisplayName(e.target.value)}
+                  placeholder="Your Display Name"
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-obsidian-900 text-xs font-medium text-slate-900 dark:text-white"
+                />
+                <input
+                  type="email"
+                  required
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  placeholder="Email address"
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-obsidian-900 text-xs font-medium text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  placeholder="Password (min 6 characters)"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-obsidian-900 text-xs font-medium text-slate-900 dark:text-white"
+                />
+                <Button type="submit" variant="volt" size="sm" isLoading={isSavingAccount} className="font-black px-5 shrink-0">
+                  Save Progress 🔥
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {accountSavedSuccess && (
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            Account claimed successfully! All your decks and streak are saved.
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <Button

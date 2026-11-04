@@ -101,6 +101,12 @@ export default function HomePage() {
 
           {/* Quick Import Chips */}
           <div className="flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300 font-medium">
+            <Link
+              href="/onboarding"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-volt-400 text-obsidian-950 font-black hover:bg-volt-300 transition-colors shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> 60s Fast Start Quiz
+            </Link>
             <span className="text-slate-400">Import anything:</span>
             <Link
               href="/create?type=pdf"
