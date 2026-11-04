@@ -5,7 +5,8 @@ import { getAIClient } from '@chizmo/ai';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userAnswer, referenceAnswer, question } = body;
+    const { userAnswer, question } = body;
+    const referenceAnswer = body.referenceAnswer || body.expectedAnswer || body.back;
 
     if (!userAnswer || !referenceAnswer) {
       return NextResponse.json(

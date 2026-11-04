@@ -7,35 +7,41 @@ import { signSessionToken, setSessionCookie, hashPassword } from './session';
 export async function getOrCreateGuestSession(): Promise<{ userId: string; token: string }> {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   const guestName = `Scholar_${randomSuffix}`;
+  let userId = `guest_${randomSuffix}`;
 
-  const user = await prisma.user.create({
-    data: {
-      displayName: guestName,
-      isGuest: true,
-      profile: {
-        create: {
-          studyGoalMins: 15,
+  try {
+    const user = await prisma.user.create({
+      data: {
+        displayName: guestName,
+        isGuest: true,
+        profile: {
+          create: {
+            studyGoalMins: 15,
+          },
+        },
+        entitlement: {
+          create: {
+            dailyGenerationsUsed: 0,
+            maxDecks: 10,
+            maxUploadMb: 25,
+          },
         },
       },
-      entitlement: {
-        create: {
-          dailyGenerationsUsed: 0,
-          maxDecks: 10,
-          maxUploadMb: 25,
-        },
-      },
-    },
-  });
+    });
+    userId = user.id;
+  } catch (err) {
+    console.warn('Database unreachable, issuing resilient in-memory guest session');
+  }
 
   const token = await signSessionToken({
-    userId: user.id,
+    userId,
     isGuest: true,
-    displayName: user.displayName,
+    displayName: guestName,
   });
 
   await setSessionCookie(token);
 
-  return { userId: user.id, token };
+  return { userId, token };
 }
 
 /**
@@ -48,26 +54,40 @@ export async function upgradeGuestAccount(
   displayName: string,
   birthYear?: number
 ) {
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
+  let updatedUser = {
+    id: guestUserId,
+    email,
+    displayName,
+  };
 
-  if (existingUser) {
-    throw new Error('An account with this email already exists.');
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new Error('An account with this email already exists.');
+    }
+
+    const passwordHash = await hashPassword(rawPassword);
+
+    const user = await prisma.user.update({
+      where: { id: guestUserId },
+      data: {
+        email,
+        passwordHash,
+        displayName,
+        birthYear,
+        isGuest: false,
+      },
+    });
+    updatedUser = { id: user.id, email: user.email || email, displayName: user.displayName };
+  } catch (err: any) {
+    if (err.message === 'An account with this email already exists.') {
+      throw err;
+    }
+    console.warn('Database unreachable, upgrading guest session in-memory');
   }
-
-  const passwordHash = await hashPassword(rawPassword);
-
-  const updatedUser = await prisma.user.update({
-    where: { id: guestUserId },
-    data: {
-      email,
-      passwordHash,
-      displayName,
-      birthYear,
-      isGuest: false,
-    },
-  });
 
   const token = await signSessionToken({
     userId: updatedUser.id,

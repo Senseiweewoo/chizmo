@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const userId = session?.userId || 'guest-user';
 
     const body = await req.json();
-    const { deckId, format = 'TLDR' } = body;
+    const { deckId, format = 'TLDR', content, text } = body;
 
     let title = 'Study Guide Summary';
     let cards: any[] = [];
@@ -19,6 +19,16 @@ export async function POST(req: NextRequest) {
         title = deck.title;
         cards = deck.cards || [];
       }
+    } else if (content || text) {
+      const rawText = (content || text).trim();
+      title = 'Custom Study Notes';
+      cards = [
+        {
+          front: 'Primary Topic Focus',
+          back: rawText,
+          hint: 'Fundamental synthesis',
+        },
+      ];
     }
 
     if (cards.length === 0) {

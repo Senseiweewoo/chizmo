@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     const userId = session?.userId || 'guest-user';
 
     const body = await req.json();
-    const { deckId, message, history = [], socraticMode = true } = body;
+    const { deckId, history = [], socraticMode = true } = body;
+    const message = body.message || body.question || body.prompt;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ success: false, error: 'Message is required' }, { status: 400 });
