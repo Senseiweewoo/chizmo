@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChizzyMascot } from '../brand/ChizzyMascot';
-import { Zap, Flame, Plus, Moon, Sun, BookOpen, Radio, User, Compass } from 'lucide-react';
+import { Zap, Flame, Plus, Moon, Sun, BookOpen, Radio, User, Compass, Trophy } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { GamificationHeaderWidget } from '../gamification/GamificationHeaderWidget';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -52,6 +53,7 @@ export function Navbar() {
   const navLinks = [
     { label: 'Home', href: '/', icon: Compass },
     { label: 'Library', href: '/library', icon: BookOpen },
+    { label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { label: 'Live Arena', href: '/live', icon: Radio },
   ];
 
@@ -92,17 +94,7 @@ export function Navbar() {
 
         {/* Actions & Gamification Pills */}
         <div className="flex items-center gap-2.5">
-          {/* Streak Flame Pill */}
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 rounded-full text-amber-600 dark:text-amber-400 text-xs font-bold shadow-sm">
-            <Flame className="w-4 h-4 fill-amber-500 text-amber-500 animate-pulse-slow" />
-            <span>{userStats?.streak ?? 1}d</span>
-          </div>
-
-          {/* XP Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-chizmo-50 dark:bg-chizmo-950/40 border border-chizmo-200/60 dark:border-chizmo-800/60 rounded-full text-chizmo-600 dark:text-chizmo-400 text-xs font-bold shadow-sm">
-            <Zap className="w-4 h-4 fill-chizmo-500 text-chizmo-500" />
-            <span>{userStats?.xp ?? 50} XP</span>
-          </div>
+          <GamificationHeaderWidget />
 
           {/* Create Big '+' Button */}
           <Link href="/create">

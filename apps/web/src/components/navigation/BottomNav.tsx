@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, BookOpen, Plus, Radio, User } from 'lucide-react';
+import { Compass, BookOpen, Plus, Radio, User, Trophy } from 'lucide-react';
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -12,8 +12,8 @@ export function BottomNav() {
     { label: 'Home', href: '/', icon: Compass },
     { label: 'Library', href: '/library', icon: BookOpen },
     { label: 'Create', href: '/create', icon: Plus, isAction: true },
+    { label: 'Arena', href: '/leaderboard', icon: Trophy },
     { label: 'Live', href: '/live', icon: Radio },
-    { label: 'Profile', href: '/profile', icon: User },
   ];
 
   return (

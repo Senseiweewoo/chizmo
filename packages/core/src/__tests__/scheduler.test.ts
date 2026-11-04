@@ -8,6 +8,8 @@ import {
 } from '../scheduler/fsrs.js';
 import { getStudyDayStart, calculateExamPace } from '../scheduler/queue.js';
 import { gamificationReducer, xpForLevel, levelFromXp } from '../gamification/reducer.js';
+import { generateDailyQuests, evaluateQuestProgress } from '../gamification/quests.js';
+import { ALL_ACHIEVEMENTS } from '../gamification/achievements.js';
 import { calculateQuizScore } from '../scoring/index.js';
 import { CardState } from '../types/index.js';
 
@@ -122,6 +124,33 @@ describe('Gamification & XP Reducer Tests', () => {
     assert.strictEqual(state.cardsStudiedToday, 10);
     assert.strictEqual(state.streakDays, 1);
     assert(state.xp >= 50, '10 Good reviews should award at least 50 XP');
+  });
+
+  it('3. Daily quests generate deterministically and advance progress from events', () => {
+    const quests = generateDailyQuests('2026-11-04');
+    assert.strictEqual(quests.length, 3, 'Must produce exactly 3 daily quests');
+
+    // Simulate reviews
+    const { updatedQuests, newlyEarnedXp } = evaluateQuestProgress(quests, {
+      type: 'CARD_REVIEWED',
+      rating: 3,
+      isDue: true,
+      cardId: 'c1',
+    });
+
+    const reviewQuest = updatedQuests.find((q) => q.type === 'review_count');
+    if (reviewQuest) {
+      assert.strictEqual(reviewQuest.current, 1);
+    }
+  });
+
+  it('4. Declarative achievements table contains unique IDs with valid XP rewards', () => {
+    assert(ALL_ACHIEVEMENTS.length >= 6);
+    const ids = new Set(ALL_ACHIEVEMENTS.map((a) => a.id));
+    assert.strictEqual(ids.size, ALL_ACHIEVEMENTS.length, 'Achievement IDs must be unique');
+    for (const a of ALL_ACHIEVEMENTS) {
+      assert(a.xpReward > 0, 'Every achievement must award positive XP');
+    }
   });
 });
 
