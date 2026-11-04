@@ -416,4 +416,66 @@ export const DeckService = {
       return false;
     }
   },
+
+  /**
+   * Search and list all public community decks
+   */
+  async getPublicDecks(query?: string, tag?: string): Promise<DeckWithMeta[]> {
+    const q = (query || '').toLowerCase().trim();
+    const t = (tag || '').toLowerCase().trim();
+
+    return inMemoryDecks.filter((deck) => {
+      if (deck.visibility !== 'PUBLIC') return false;
+      const matchesQ =
+        !q ||
+        deck.title.toLowerCase().includes(q) ||
+        (deck.description && deck.description.toLowerCase().includes(q));
+      const matchesTag = !t || deck.tags.some((tagItem) => tagItem.toLowerCase() === t);
+      return matchesQ && matchesTag;
+    });
+  },
+
+  /**
+   * Fork (clone) a community deck into the user's personal library
+   */
+  async forkDeck(deckId: string, targetUserId: string): Promise<DeckWithMeta | null> {
+    const source = inMemoryDecks.find((d) => d.id === deckId);
+    if (!source) return null;
+
+    const newDeckId = `fork-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const clonedCards = (source.cards || []).map((c, idx) => ({
+      ...c,
+      id: `c-fork-${newDeckId}-${idx}`,
+      deckId: newDeckId,
+    }));
+
+    const forkedDeck: DeckWithMeta = {
+      ...source,
+      id: newDeckId,
+      ownerId: targetUserId,
+      title: `${source.title} (Fork)`,
+      visibility: 'PRIVATE',
+      cardCount: clonedCards.length,
+      dueToday: clonedCards.length,
+      cards: clonedCards,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    inMemoryDecks.unshift(forkedDeck);
+    return forkedDeck;
+  },
+
+  /**
+   * Submit a content moderation report for a deck
+   */
+  async reportDeck(deckId: string, reporterId: string, reason: string, details?: string) {
+    return {
+      success: true,
+      reportId: `rep-${Date.now()}`,
+      deckId,
+      status: 'UNDER_REVIEW',
+      message: 'Thank you for keeping our community safe. Our moderation team has been notified.',
+    };
+  },
 };
