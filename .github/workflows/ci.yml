@@ -49,8 +49,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Generate Prisma Client
-        run: npm run db:generate
+      - name: Generate Prisma Client & Push Schema
+        run: |
+          npm run db:generate
+          npm run db:push
         env:
           DATABASE_URL: "postgresql://chizmo_user:chizmo_password@localhost:5432/chizmo_db?schema=public"
 
@@ -72,3 +74,5 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: "postgresql://chizmo_user:chizmo_password@localhost:5432/chizmo_db?schema=public"
+          JWT_SECRET: "chizmo-super-secure-default-jwt-secret-key-32-chars"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
