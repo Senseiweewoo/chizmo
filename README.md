@@ -66,7 +66,7 @@ flowchart TD
 
 ---
 
-## 🎮 16 Development Phases & Feature Directory
+## 🎮 17 Development Phases & Feature Directory
 
 | Phase | Feature | Key Routes & Capabilities |
 | :--- | :--- | :--- |
@@ -86,6 +86,7 @@ flowchart TD
 | **14** | **Accessibility & Focus Standards** | WCAG 2.2 AA compliant contrast, high-visibility focus indicators, `@media (prefers-reduced-motion)` overrides |
 | **15** | **60-Second Rapid Onboarding** | `/onboarding` — 5-step fast start wizard, zero-barrier guest study session, instant 1-day streak claim modal |
 | **16** | **PWA & Offline Study Support** | `manifest.json`, `sw.js` — Service worker caching, offline flashcards, background review sync queue |
+| **17** | **Production Orchestration & Diagnostics** | `/api/health`, `docker-compose.prod.yml` — Multi-stage Dockerfiles (Web, Worker, Realtime), cross-domain smoke tests (41/41 passing) |
 
 ---
 
