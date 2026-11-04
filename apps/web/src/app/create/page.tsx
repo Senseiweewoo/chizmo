@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +21,9 @@ import {
   AlertCircle,
   HelpCircle,
   Flame,
+  FileUp,
+  Link as LinkIcon,
+  Download,
 } from 'lucide-react';
 
 interface ReviewCard {
@@ -30,7 +33,7 @@ interface ReviewCard {
   back: string;
   hint?: string;
   explanation?: string;
-  sourceRef?: { quote?: string };
+  sourceRef?: { quote?: string; page?: number; slide?: number; startSec?: number };
   difficulty: string;
   tags: string[];
   selected: boolean;
@@ -42,13 +45,26 @@ function CreateFormContent() {
   const searchParams = useSearchParams();
   const prefillTopic = searchParams?.get('topic') || '';
 
-  const [activeTab, setActiveTab] = useState<'topic' | 'text' | 'manual'>('topic');
+  const [activeTab, setActiveTab] = useState<'topic' | 'file' | 'url' | 'import' | 'text' | 'manual'>('topic');
 
-  // Generation Inputs
+  // Topic & Text Inputs
   const [topic, setTopic] = useState(prefillTopic);
   const [pastedText, setPastedText] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [targetExam, setTargetExam] = useState('');
+
+  // File Upload State
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // URL State
+  const [importUrl, setImportUrl] = useState('');
+
+  // Quizlet / Anki Import State
+  const [quizletExportText, setQuizletExportText] = useState('');
+  const [quizletDeckTitle, setQuizletDeckTitle] = useState('');
+
+  // Progress & State Machine
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>('');
 
@@ -73,6 +89,7 @@ function CreateFormContent() {
     }
   }, [prefillTopic]);
 
+  // Handle AI Generation (Topic or Pasted Text)
   const handleGenerateCards = async (sourceType: 'TOPIC' | 'TEXT') => {
     const content = sourceType === 'TOPIC' ? topic.trim() : pastedText.trim();
     if (!content) return;
@@ -99,24 +116,7 @@ function CreateFormContent() {
 
       const data = await res.json();
       if (data.success && data.cards) {
-        setTopicSummary(data.topicSummary || '');
-        setPipelineStats(data.stats);
-
-        const mapped: ReviewCard[] = data.cards.map((c: any, idx: number) => ({
-          id: `gen-${idx}-${Date.now()}`,
-          type: c.type || 'basic',
-          front: c.front,
-          back: c.back,
-          hint: c.hint,
-          explanation: c.explanation,
-          sourceRef: c.sourceRef,
-          difficulty: c.difficulty || 'medium',
-          tags: c.tags || ['AI-Generated'],
-          selected: true,
-          isGrounded: c.isGrounded !== false,
-        }));
-
-        setReviewCards(mapped);
+        populateReviewCards(data.cards, data.topicSummary, data.stats);
       }
     } catch (err) {
       console.error('Generation failed:', err);
@@ -124,6 +124,132 @@ function CreateFormContent() {
       setIsGenerating(false);
       setGenerationStep('');
     }
+  };
+
+  // Handle File Upload (PDF, PPTX, DOCX, Images)
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setIsGenerating(true);
+    setGenerationStep(`Validating ${selectedFile.name} magic bytes & security checks...`);
+
+    try {
+      setTimeout(() => setGenerationStep('Extracting document text layer and slide notes...'), 700);
+      setTimeout(() => setGenerationStep('Synthesizing atomic active recall cards...'), 1400);
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('difficulty', difficulty);
+      formData.append('targetExam', targetExam);
+
+      const res = await fetch('/api/ingest/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.result?.cards) {
+        populateReviewCards(data.result.cards, data.result.topicSummary, data.result.stats);
+      } else {
+        alert(data.error || 'Failed to process file');
+      }
+    } catch (err) {
+      console.error('Upload processing failed:', err);
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
+  };
+
+  // Handle YouTube or Web URL Import
+  const handleUrlImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importUrl.trim()) return;
+
+    setIsGenerating(true);
+    setGenerationStep('Running SSRF checks & fetching captions/transcript...');
+
+    try {
+      setTimeout(() => setGenerationStep('Segmenting transcript chapters & timestamps...'), 800);
+      setTimeout(() => setGenerationStep('Generating grounded flashcards with citations...'), 1500);
+
+      const res = await fetch('/api/ingest/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: importUrl.trim(),
+          difficulty,
+          targetExam,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.result?.cards) {
+        populateReviewCards(data.result.cards, data.result.topicSummary, data.result.stats);
+      } else {
+        alert(data.error || 'Failed to ingest URL');
+      }
+    } catch (err) {
+      console.error('URL import failed:', err);
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
+  };
+
+  // Handle Quizlet / Anki TSV/CSV Import Wizard
+  const handleQuizletAnkiImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quizletExportText.trim()) return;
+
+    setIsGenerating(true);
+    setGenerationStep('Parsing card delimiters and stripping residual HTML...');
+
+    try {
+      const res = await fetch('/api/ingest/quizlet-anki', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: quizletExportText,
+          title: quizletDeckTitle || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.deckId) {
+        // Direct study entry!
+        router.push(`/study/${data.deckId}`);
+      } else {
+        alert(data.error || 'Failed to import cards');
+      }
+    } catch (err) {
+      console.error('Quizlet/Anki import failed:', err);
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
+  };
+
+  const populateReviewCards = (cards: any[], summary: string, stats: any) => {
+    setTopicSummary(summary || '');
+    setPipelineStats(stats);
+
+    const mapped: ReviewCard[] = cards.map((c: any, idx: number) => ({
+      id: `gen-${idx}-${Date.now()}`,
+      type: c.type || 'basic',
+      front: c.front,
+      back: c.back,
+      hint: c.hint,
+      explanation: c.explanation,
+      sourceRef: c.sourceRef,
+      difficulty: c.difficulty || 'medium',
+      tags: c.tags || ['AI-Generated'],
+      selected: true,
+      isGrounded: c.isGrounded !== false,
+    }));
+
+    setReviewCards(mapped);
   };
 
   const handleToggleCardSelection = (id: string) => {
@@ -144,7 +270,9 @@ function CreateFormContent() {
       const deckTitle =
         activeTab === 'topic'
           ? topic || 'AI Study Deck'
-          : topicSummary.slice(0, 40) || 'Pasted Notes Deck';
+          : activeTab === 'file' && selectedFile
+          ? selectedFile.name.replace(/\.[^/.]+$/, '')
+          : topicSummary.slice(0, 40) || 'Study Deck';
 
       // 1. Create the deck
       const createRes = await fetch('/api/decks', {
@@ -153,7 +281,7 @@ function CreateFormContent() {
         body: JSON.stringify({
           title: deckTitle,
           description: topicSummary || 'AI-generated grounded flashcards with active recall.',
-          tags: ['AI-Generated', 'FSRS-4.5', activeTab === 'topic' ? 'Topic' : 'Notes'],
+          tags: ['AI-Generated', 'FSRS-4.5', activeTab.toUpperCase()],
           color: '#6366F1',
         }),
       });
@@ -179,7 +307,6 @@ function CreateFormContent() {
       }
 
       if (startStudying) {
-        // Instant wow-moment: Drop straight into flashcards!
         router.push(`/study/${newDeckId}`);
       } else {
         router.push(`/decks/${newDeckId}`);
@@ -410,51 +537,84 @@ function CreateFormContent() {
     );
   }
 
-  // Generator & Input View
+  // Unified Ingestion Hub View
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-200">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Create Study Material
+          Import & Create Study Material
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Transform topics or study notes into grounded active-recall flashcards in under 60 seconds.
+          Turn files, YouTube videos, lecture notes, or topics into grounded active-recall flashcards in seconds.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-4 overflow-x-auto pb-1 text-sm">
         <button
           onClick={() => setActiveTab('topic')}
-          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
             activeTab === 'topic'
               ? 'border-volt-500 text-slate-900 dark:text-white'
               : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-volt-500" /> AI Topic Prompt
+          <Sparkles className="w-4 h-4 text-volt-500" /> AI Topic
         </button>
 
         <button
-          onClick={() => setActiveTab('text')}
-          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'text'
+          onClick={() => setActiveTab('file')}
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === 'file'
               ? 'border-chizmo-600 text-slate-900 dark:text-white'
               : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
           }`}
         >
-          <FileText className="w-4 h-4 text-chizmo-600" /> Paste Notes / Text
+          <FileUp className="w-4 h-4 text-chizmo-600" /> File (PDF/PPTX/DOCX/OCR)
         </button>
 
         <button
-          onClick={() => setActiveTab('manual')}
-          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'manual'
+          onClick={() => setActiveTab('url')}
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === 'url'
+              ? 'border-red-500 text-slate-900 dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+          }`}
+        >
+          <Youtube className="w-4 h-4 text-red-500" /> YouTube / Web
+        </button>
+
+        <button
+          onClick={() => setActiveTab('import')}
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === 'import'
+              ? 'border-emerald-500 text-slate-900 dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+          }`}
+        >
+          <Download className="w-4 h-4 text-emerald-500" /> Quizlet / Anki
+        </button>
+
+        <button
+          onClick={() => setActiveTab('text')}
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === 'text'
               ? 'border-indigo-500 text-slate-900 dark:text-white'
               : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
           }`}
         >
-          <Layers className="w-4 h-4 text-indigo-500" /> Manual Deck Studio
+          <FileText className="w-4 h-4 text-indigo-500" /> Paste Notes
+        </button>
+
+        <button
+          onClick={() => setActiveTab('manual')}
+          className={`pb-3 font-bold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === 'manual'
+              ? 'border-slate-700 dark:border-slate-300 text-slate-900 dark:text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-4 h-4" /> Manual Deck
         </button>
       </div>
 
@@ -466,16 +626,16 @@ function CreateFormContent() {
           </div>
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              AI Card Pipeline Running...
+              Ingestion Pipeline Active...
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {generationStep || 'Generating atomic active recall cards...'}
+              {generationStep || 'Processing material and generating atomic active-recall cards...'}
             </p>
           </div>
         </Card>
       )}
 
-      {/* AI Topic Prompt Tab */}
+      {/* Tab 1: AI Topic Prompt */}
       {!isGenerating && activeTab === 'topic' && (
         <Card className="space-y-6 p-6 sm:p-8">
           <form
@@ -551,7 +711,186 @@ function CreateFormContent() {
         </Card>
       )}
 
-      {/* Paste Notes / Text Tab */}
+      {/* Tab 2: File Upload (PDF, PPTX, DOCX, Image OCR) */}
+      {!isGenerating && activeTab === 'file' && (
+        <Card className="space-y-6 p-6 sm:p-8">
+          <form onSubmit={handleFileUpload} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1.5">
+                Upload Document or Photo *
+              </label>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-chizmo-500 rounded-3xl p-8 text-center cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-900/50"
+              >
+                <FileUp className="w-10 h-10 text-chizmo-600 mx-auto mb-2" />
+                <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  {selectedFile ? selectedFile.name : 'Click to select or drag & drop files here'}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Supported formats: PDF, PowerPoint (.pptx), Word (.docx), or Photos/Images (.png, .jpg)
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Direct binary verification via magic bytes. Maximum file size: 25MB
+                </p>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.pptx,.docx,.png,.jpg,.jpeg,.webp"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setSelectedFile(e.target.files[0]);
+                  }
+                }}
+                className="hidden"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Difficulty Level
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDifficulty(d)}
+                      className={`py-2 text-xs font-bold rounded-xl border capitalize transition-colors ${
+                        difficulty === d
+                          ? 'bg-chizmo-600 text-white border-chizmo-600 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Target Exam
+                </label>
+                <input
+                  type="text"
+                  value={targetExam}
+                  onChange={(e) => setTargetExam(e.target.value)}
+                  placeholder="e.g. AP Biology, MCAT, SAT"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                disabled={!selectedFile}
+                isLoading={isGenerating}
+                className="w-full text-base font-bold shadow-lg shadow-chizmo-500/25"
+              >
+                <FileUp className="w-5 h-5 mr-1" /> Extract, Ground & Generate Flashcards
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* Tab 3: YouTube / Web URL */}
+      {!isGenerating && activeTab === 'url' && (
+        <Card className="space-y-6 p-6 sm:p-8">
+          <form onSubmit={handleUrlImport} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1.5">
+                Paste YouTube Video Link or Article URL *
+              </label>
+              <div className="relative">
+                <input
+                  type="url"
+                  required
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or https://..."
+                  className="w-full h-12 pl-10 pr-4 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-obsidian-950 focus:outline-none focus:ring-2 focus:ring-red-500 text-slate-900 dark:text-white"
+                />
+                <Youtube className="w-5 h-5 text-red-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+              <p className="text-xs text-slate-400 mt-1.5">
+                Automatically extracts caption tracks, segments by video timestamps, and preserves citations for each generated card.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                isLoading={isGenerating}
+                className="w-full text-base font-bold bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/25"
+              >
+                <Youtube className="w-5 h-5 mr-1" /> Fetch Transcript & Generate Cards
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* Tab 4: Quizlet / Anki Import Wizard */}
+      {!isGenerating && activeTab === 'import' && (
+        <Card className="space-y-6 p-6 sm:p-8">
+          <form onSubmit={handleQuizletAnkiImport} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1">
+                Deck Title
+              </label>
+              <input
+                type="text"
+                value={quizletDeckTitle}
+                onChange={(e) => setQuizletDeckTitle(e.target.value)}
+                placeholder="e.g. AP US History Key Battles"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1.5">
+                Paste Quizlet or Anki Export (TSV / CSV) *
+              </label>
+              <textarea
+                rows={6}
+                required
+                value={quizletExportText}
+                onChange={(e) => setQuizletExportText(e.target.value)}
+                placeholder="Mitochondria	Powerhouse of the cell, generating ATP
+Chloroplast	Site of photosynthesis in plant cells"
+                className="w-full p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-obsidian-950 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                In Quizlet: Click <em>... -&gt; Export -&gt; Copy text</em>. Automatically strips HTML and creates active recall cards.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                isLoading={isGenerating}
+                className="w-full text-base font-bold bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/25"
+              >
+                <Download className="w-5 h-5 mr-1" /> Import Deck & Start Studying
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* Tab 5: Paste Notes / Text */}
       {!isGenerating && activeTab === 'text' && (
         <Card className="space-y-6 p-6 sm:p-8">
           <form
@@ -575,47 +914,6 @@ function CreateFormContent() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Difficulty
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['easy', 'medium', 'hard'] as const).map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setDifficulty(d)}
-                      className={`py-2 text-xs font-bold rounded-xl border capitalize transition-colors ${
-                        difficulty === d
-                          ? 'bg-chizmo-600 text-white border-chizmo-600 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  File Upload Formats (Phase 5 Pipeline)
-                </label>
-                <div className="flex gap-2">
-                  <span className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-400">
-                    <FileText className="w-3.5 h-3.5" /> PDF / DOCX
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-400">
-                    <Youtube className="w-3.5 h-3.5" /> YouTube
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-400">
-                    <Upload className="w-3.5 h-3.5" /> OCR
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <div className="pt-2">
               <Button
                 type="submit"
@@ -631,7 +929,7 @@ function CreateFormContent() {
         </Card>
       )}
 
-      {/* Manual Deck Studio Tab */}
+      {/* Tab 6: Manual Deck Studio */}
       {!isGenerating && activeTab === 'manual' && (
         <Card className="space-y-6 p-6 sm:p-8">
           <form onSubmit={handleManualCreate} className="space-y-5">
