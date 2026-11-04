@@ -25,6 +25,7 @@ import {
   PenTool,
   Zap,
   Puzzle,
+  BookOpen,
 } from 'lucide-react';
 
 interface Flashcard {
@@ -255,10 +256,20 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
             )}
           </div>
 
-          <div className="flex items-center gap-2 self-start">
+          <div className="flex flex-wrap items-center gap-2 self-start">
             <Link href={`/study/${deck.id}`}>
               <Button size="lg" variant="volt" className="shadow-lg shadow-volt-500/25">
                 <Play className="w-5 h-5 fill-slate-950" /> Study Flashcards
+              </Button>
+            </Link>
+            <Link href={`/study/${deck.id}/tutor`}>
+              <Button size="lg" variant="primary" className="shadow-md shadow-indigo-600/20 font-bold">
+                <Sparkles className="w-4 h-4 mr-1 text-volt-400" /> Socratic AI Tutor
+              </Button>
+            </Link>
+            <Link href={`/study/${deck.id}/summary`}>
+              <Button size="lg" variant="outline">
+                <BookOpen className="w-4 h-4 mr-1" /> Summary
               </Button>
             </Link>
             <Button

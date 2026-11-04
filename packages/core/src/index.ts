@@ -11,4 +11,5 @@ export * from './ingestion/ssrf-guard.js';
 export * from './ingestion/text-cleaner.js';
 export * from './ingestion/delimited-parser.js';
 export * from './ingestion/youtube-parser.js';
+export * from './safety/crisis-detector.js';
 export { z } from 'zod';
