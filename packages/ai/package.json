@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
     "@chizmo/core": "^0.1.0",

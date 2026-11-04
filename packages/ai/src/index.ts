@@ -6,6 +6,11 @@ export * from './interface.js';
 export * from './prompts/templates.js';
 export * from './providers/mock.js';
 export * from './providers/openai.js';
+export * from './pipeline/chunker.js';
+export * from './pipeline/grounding.js';
+export * from './pipeline/dedupe.js';
+export * from './pipeline/critic.js';
+export * from './pipeline/card-generator.js';
 
 /**
  * AI Provider Factory with automatic fallback

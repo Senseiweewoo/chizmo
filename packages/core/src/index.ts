@@ -4,3 +4,4 @@ export * from './scheduler/queue.js';
 export * from './scoring/index.js';
 export * from './gamification/reducer.js';
 export * from './validators/index.js';
+export { z } from 'zod';
