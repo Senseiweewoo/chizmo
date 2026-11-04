@@ -121,7 +121,24 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
           setExamDate(data.examDate || null);
           setExamPace(data.examPace || null);
           setQueue(data.items);
+          try {
+            localStorage.setItem(`chizmo_deck_cache_${deckId}`, JSON.stringify(data));
+          } catch {}
         }
+      })
+      .catch(() => {
+        // Fallback to offline localStorage cache
+        try {
+          const cached = localStorage.getItem(`chizmo_deck_cache_${deckId}`);
+          if (cached) {
+            const data = JSON.parse(cached);
+            if (data.items) {
+              setDeckTitle(data.deckTitle || 'Study Session (Offline)');
+              setDeckColor(data.deckColor || '#6366F1');
+              setQueue(data.items);
+            }
+          }
+        } catch {}
       })
       .finally(() => setLoading(false));
   }, [deckId]);
@@ -180,7 +197,7 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
       setRecentXpToast(earned);
       setTimeout(() => setRecentXpToast(null), 1200);
 
-      // Submit review in background
+      // Submit review in background (with offline queue fallback)
       try {
         const res = await fetch('/api/study/review', {
           method: 'POST',
@@ -196,7 +213,18 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
           setLastReviewLog(data.log);
         }
       } catch (err) {
-        console.error('Failed to log review:', err);
+        console.warn('Network offline, queueing review for background sync:', err);
+        try {
+          const raw = localStorage.getItem('chizmo_offline_reviews') || '[]';
+          const offlineQueue = JSON.parse(raw);
+          offlineQueue.push({
+            cardId,
+            rating,
+            responseMs: 1200,
+            reviewedAt: new Date().toISOString(),
+          });
+          localStorage.setItem('chizmo_offline_reviews', JSON.stringify(offlineQueue));
+        } catch {}
       }
     },
     [currentItem]
