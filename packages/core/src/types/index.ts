@@ -5,7 +5,14 @@
 
 export type LearnState = 'NEW' | 'LEARNING' | 'REVIEW' | 'RELEARNING';
 
-export type Rating = 1 | 2 | 3 | 4; // 1: Again, 2: Hard, 3: Good, 4: Easy
+export const Rating = {
+  Again: 1,
+  Hard: 2,
+  Good: 3,
+  Easy: 4,
+} as const;
+
+export type Rating = (typeof Rating)[keyof typeof Rating]; // 1: Again, 2: Hard, 3: Good, 4: Easy
 
 export type CardType =
   | 'basic'

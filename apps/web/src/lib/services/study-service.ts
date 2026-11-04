@@ -303,6 +303,73 @@ export const StudyService = {
   },
 
   /**
+   * Retrieve weak spot cards (lapses >= 1, difficulty >= 6.0, or relearning)
+   */
+  async getWeakSpots(userId: string, deckId?: string) {
+    const userDecks = await DeckService.getUserDecks(userId);
+    const weakSpots: Array<{
+      card: any;
+      deckTitle: string;
+      deckColor: string;
+      state: CardState;
+      lapses: number;
+      difficulty: number;
+      isLeech: boolean;
+      retrievability: number;
+    }> = [];
+
+    const now = new Date();
+
+    for (const d of userDecks) {
+      if (deckId && d.id !== deckId) continue;
+      const deck = await DeckService.getDeckById(d.id, userId);
+      if (!deck || !deck.cards) continue;
+
+      for (const card of deck.cards) {
+        const stateKey = `${userId}:${card.id}`;
+        const existing = inMemoryCardStates.get(stateKey);
+        const st: CardState = existing || {
+          cardId: card.id,
+          userId,
+          state: 'NEW',
+          stability: 0,
+          difficulty: 5.0,
+          due: now,
+          reps: 0,
+          lapses: 0,
+        };
+
+        const elapsedDays = Math.max(0, (now.getTime() - new Date(st.due).getTime()) / (1000 * 60 * 60 * 24));
+        const r = st.stability > 0 ? Math.exp((-Math.LN10 / (9 * st.stability)) * elapsedDays) : 0.5;
+
+        const isLeech = isLeechCard(st);
+        const isWeak = st.lapses > 0 || st.difficulty >= 6.0 || st.state === 'RELEARNING' || isLeech;
+
+        if (isWeak) {
+          weakSpots.push({
+            card,
+            deckTitle: deck.title,
+            deckColor: deck.color || '#6366F1',
+            state: st,
+            lapses: st.lapses,
+            difficulty: st.difficulty,
+            isLeech,
+            retrievability: Math.round(r * 100),
+          });
+        }
+      }
+    }
+
+    weakSpots.sort((a, b) => {
+      if (a.isLeech !== b.isLeech) return a.isLeech ? -1 : 1;
+      if (a.lapses !== b.lapses) return b.lapses - a.lapses;
+      return b.difficulty - a.difficulty;
+    });
+
+    return weakSpots;
+  },
+
+  /**
    * Configure exam date mode for a deck
    */
   async configureExamMode(deckId: string, userId: string, examDate: Date | null) {

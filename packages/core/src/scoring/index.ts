@@ -3,6 +3,8 @@
  * Pure logic for server-authoritative scoring and latency adjustment
  */
 
+export * from './write-grading.js';
+
 export interface ScoreCalculationInput {
   basePoints?: number; // Default 1000
   totalAllowedMs: number;

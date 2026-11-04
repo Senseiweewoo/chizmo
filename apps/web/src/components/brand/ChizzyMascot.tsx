@@ -3,16 +3,21 @@ import React from 'react';
 interface ChizzyProps {
   className?: string;
   size?: number;
-  mood?: 'excited' | 'studying' | 'supercharged';
+  mood?: 'excited' | 'studying' | 'supercharged' | 'thinking' | 'celebrating' | 'explaining';
+  animated?: boolean;
 }
 
 /**
  * Chizzy ⚡🦉 - The hyper-smart energetic lightning-owl mascot of Chizmo
  * Original brand vector mascot with electric aura and expressive eyes
  */
-export function ChizzyMascot({ className = '', size = 64, mood = 'excited' }: ChizzyProps) {
+export function ChizzyMascot({ className = '', size = 64, mood = 'excited', animated = false }: ChizzyProps) {
+  const isAnimated = animated || mood === 'celebrating' || mood === 'thinking';
   return (
-    <div className={`relative inline-block select-none ${className}`} style={{ width: size, height: size }}>
+    <div
+      className={`relative inline-block select-none ${isAnimated ? 'animate-bounce-subtle' : ''} ${className}`}
+      style={{ width: size, height: size }}
+    >
       <svg
         viewBox="0 0 100 100"
         fill="none"

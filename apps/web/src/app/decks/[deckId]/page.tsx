@@ -20,6 +20,11 @@ import {
   Flame,
   CheckCircle2,
   TrendingUp,
+  Target,
+  FileText,
+  PenTool,
+  Zap,
+  Puzzle,
 } from 'lucide-react';
 
 interface Flashcard {
@@ -273,6 +278,139 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
           <span className="font-semibold text-emerald-600">Active FSRS-4.5 Engine</span>
         </div>
       </Card>
+
+      {/* 6 Core Study Modes Launcher Grid */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>Study Modes</span>
+            <Badge variant="indigo" className="text-[10px]">6 Active Modes</Badge>
+          </h2>
+          <span className="text-xs text-slate-500 font-medium">Choose how you want to train today</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Flashcards */}
+          <Link href={`/study/${deck.id}`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-volt-400 dark:hover:border-volt-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-amber-50/20 dark:from-slate-900 dark:to-amber-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                  <Play className="w-4 h-4 fill-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors">
+                    Flashcards
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    FSRS-4.5 spaced repetition with 3D flip
+                  </p>
+                </div>
+              </div>
+              <Badge variant="volt" className="mt-2 text-[9px] w-fit">Primary</Badge>
+            </Card>
+          </Link>
+
+          {/* Quiz Mode */}
+          <Link href={`/study/${deck.id}/quiz`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-chizmo-400 dark:hover:border-chizmo-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-indigo-50/20 dark:from-slate-900 dark:to-indigo-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
+                    Speed Quiz
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    4-choice speed test with combo multipliers
+                  </p>
+                </div>
+              </div>
+              <Badge variant="indigo" className="mt-2 text-[9px] w-fit">Streak ⚡</Badge>
+            </Card>
+          </Link>
+
+          {/* Write Mode */}
+          <Link href={`/study/${deck.id}/write`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-purple-50/20 dark:from-slate-900 dark:to-purple-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-purple-600 transition-colors">
+                    Write
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    Typing recall with typo-tolerant grading
+                  </p>
+                </div>
+              </div>
+              <Badge variant="slate" className="mt-2 text-[9px] w-fit">Active Recall</Badge>
+            </Card>
+          </Link>
+
+          {/* Match Mode */}
+          <Link href={`/study/${deck.id}/match`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-emerald-50/20 dark:from-slate-900 dark:to-emerald-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+                  <Puzzle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 transition-colors">
+                    Match
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    Fast pairing game against running stopwatch
+                  </p>
+                </div>
+              </div>
+              <Badge variant="default" className="mt-2 text-[9px] w-fit">Time Trial</Badge>
+            </Card>
+          </Link>
+
+          {/* Mock Exam */}
+          <Link href={`/study/${deck.id}/test`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-blue-50/20 dark:from-slate-900 dark:to-blue-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                    Mock Test
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    Exam simulation with grades & score report
+                  </p>
+                </div>
+              </div>
+              <Badge variant="indigo" className="mt-2 text-[9px] w-fit">Exam Prep</Badge>
+            </Card>
+          </Link>
+
+          {/* Weak Spots */}
+          <Link href={`/study/${deck.id}/weak-spots`} className="group">
+            <Card className="p-3.5 h-full flex flex-col justify-between hover:border-red-400 dark:hover:border-red-500 hover:shadow-md transition-all bg-gradient-to-br from-white to-red-50/20 dark:from-slate-900 dark:to-red-950/10">
+              <div className="space-y-2">
+                <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center font-bold">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-red-600 transition-colors">
+                    Weak Spots
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                    Targeted drill on lapses & high difficulty
+                  </p>
+                </div>
+              </div>
+              <Badge variant="danger" className="mt-2 text-[9px] w-fit">Targeted</Badge>
+            </Card>
+          </Link>
+        </div>
+      </div>
 
       {/* Exam Mode & Retention Projection Widget */}
       <Card className="p-6 bg-gradient-to-br from-slate-50 to-indigo-50/40 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-4">

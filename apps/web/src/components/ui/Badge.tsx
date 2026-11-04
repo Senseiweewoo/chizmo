@@ -1,7 +1,7 @@
 import React, { HTMLAttributes } from 'react';
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'volt' | 'emerald' | 'amber' | 'blue' | 'slate';
+  variant?: 'default' | 'volt' | 'emerald' | 'amber' | 'warning' | 'blue' | 'slate' | 'indigo' | 'danger';
 }
 
 export function Badge({ className = '', variant = 'default', children, ...props }: BadgeProps) {
@@ -10,8 +10,11 @@ export function Badge({ className = '', variant = 'default', children, ...props 
     volt: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
     emerald: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
     amber: 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    warning: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
     blue: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800',
     slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+    indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800',
+    danger: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300 border-red-200/60 dark:border-red-800',
   };
 
   return (
