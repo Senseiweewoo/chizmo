@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChizzyMascot } from '../brand/ChizzyMascot';
-import { Zap, Flame, Plus, Moon, Sun, BookOpen, Radio, User, Compass, Trophy, Layers } from 'lucide-react';
+import { Zap, Flame, Plus, Moon, Sun, BookOpen, Radio, User, Compass, Trophy, Layers, TrendingUp } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { GamificationHeaderWidget } from '../gamification/GamificationHeaderWidget';
 
@@ -54,6 +54,7 @@ export function Navbar() {
     { label: 'Home', href: '/', icon: BookOpen },
     { label: 'Library', href: '/library', icon: Layers },
     { label: 'Explore', href: '/explore', icon: Compass },
+    { label: 'Analytics', href: '/analytics', icon: TrendingUp },
     { label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { label: 'Live Arena', href: '/live', icon: Radio },
   ];
