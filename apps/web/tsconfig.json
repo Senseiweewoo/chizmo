@@ -6,10 +6,7 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@chizmo/core": ["../../packages/core/src/index.ts"],
-      "@chizmo/db": ["../../packages/db/src/index.ts"],
-      "@chizmo/ai": ["../../packages/ai/src/index.ts"]
+      "@/*": ["./src/*"]
     },
     "plugins": [
       {
