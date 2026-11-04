@@ -20,7 +20,7 @@ const FACTOR = 19 / 81;
 /**
  * Clamp a number within [min, max]
  */
-function clamp(val: number, min: number, max: number): number {
+export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
 
@@ -40,6 +40,24 @@ export function calculateNextInterval(stability: number, requestRetention = 0.9,
   if (stability <= 0) return 1;
   const interval = (stability / FACTOR) * (Math.pow(requestRetention, 1 / DECAY) - 1);
   return Math.max(1, Math.min(maxInterval, Math.round(interval)));
+}
+
+/**
+ * Calculate dynamically raised retention in exam mode
+ * In the final 7 days before an exam date, target retention is raised up to 0.96 for peak recall
+ */
+export function calculateDynamicRetention(now: Date, examDate?: Date, baseRetention = 0.9): number {
+  if (!examDate) return baseRetention;
+  const diffMs = examDate.getTime() - now.getTime();
+  const daysToExam = diffMs / (1000 * 60 * 60 * 24);
+
+  if (daysToExam <= 0) return 0.96;
+  if (daysToExam <= 7) {
+    // Elevate retention linearly from baseRetention (e.g. 0.90) to 0.96
+    const fraction = (7 - daysToExam) / 7;
+    return Number((baseRetention + fraction * (0.96 - baseRetention)).toFixed(3));
+  }
+  return baseRetention;
 }
 
 /**
@@ -111,17 +129,57 @@ export function nextForgetStability(
 }
 
 /**
+ * Check if a card has reached the leech threshold (8 or more lapses)
+ */
+export function isLeechCard(state: CardState, threshold = 8): boolean {
+  return state.lapses >= threshold;
+}
+
+/**
+ * Deterministic pseudo-random number generator for interval fuzzing
+ */
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+/**
+ * Apply deterministic jitter to intervals > 3 days to prevent clumped review loads
+ */
+export function applyIntervalFuzz(intervalDays: number, seed?: number): number {
+  if (intervalDays <= 3) return intervalDays;
+  const actualSeed = seed ?? intervalDays * 1337;
+  const factor = 0.95 + pseudoRandom(actualSeed) * 0.1; // +/- 5%
+  return Math.max(3, Math.round(intervalDays * factor));
+}
+
+export interface ScheduleOptions {
+  config?: FSRSConfig;
+  examDate?: Date;
+  fuzzSeed?: number;
+}
+
+/**
  * Core FSRS schedule function
- * Pure function: pass in current state, rating, current timestamp 'now', and config
+ * Pure function: pass in current state, rating, current timestamp 'now', and options
  */
 export function scheduleCard(
   currentState: CardState | null,
   rating: Rating,
   now: Date,
-  config: FSRSConfig = DEFAULT_FSRS_CONFIG
+  optionsOrConfig: FSRSConfig | ScheduleOptions = DEFAULT_FSRS_CONFIG
 ): { next: CardState; log: ReviewLogEntry } {
+  const options: ScheduleOptions =
+    'requestRetention' in optionsOrConfig
+      ? { config: optionsOrConfig }
+      : optionsOrConfig;
+
+  const config = options.config || DEFAULT_FSRS_CONFIG;
   const w = config.w;
   const isFirstReview = !currentState || currentState.state === 'NEW' || currentState.reps === 0;
+
+  // Dynamically raise retention in final week of exam mode
+  const effectiveRetention = calculateDynamicRetention(now, options.examDate, config.requestRetention);
 
   let elapsedDays = 0;
   let currentS = 0;
@@ -159,7 +217,8 @@ export function scheduleCard(
     } else {
       // Rating 4 graduates immediately
       nextState = 'REVIEW';
-      intervalDays = calculateNextInterval(nextS, config.requestRetention, config.maximumInterval);
+      const rawInterval = calculateNextInterval(nextS, effectiveRetention, config.maximumInterval);
+      intervalDays = applyIntervalFuzz(rawInterval, options.fuzzSeed);
     }
   } else {
     // Mature or learning review
@@ -177,7 +236,8 @@ export function scheduleCard(
       nextS = nextRecallStability(currentD, currentS, R, rating, w);
       reps += 1;
       nextState = 'REVIEW';
-      intervalDays = calculateNextInterval(nextS, config.requestRetention, config.maximumInterval);
+      const rawInterval = calculateNextInterval(nextS, effectiveRetention, config.maximumInterval);
+      intervalDays = applyIntervalFuzz(rawInterval, options.fuzzSeed);
     }
   }
 
@@ -206,4 +266,79 @@ export function scheduleCard(
   };
 
   return { next: nextCardState, log: logEntry };
+}
+
+/**
+ * Deterministically replay a sequence of review logs to reconstruct CardState
+ * Verifies that the append-only ReviewLog is the single source of truth
+ */
+export function replayReviewLogs(
+  logs: ReviewLogEntry[],
+  config: FSRSConfig = DEFAULT_FSRS_CONFIG
+): CardState | null {
+  if (logs.length === 0) return null;
+
+  // Sort logs chronologically
+  const sorted = [...logs].sort((a, b) => a.reviewedAt.getTime() - b.reviewedAt.getTime());
+
+  let state: CardState | null = null;
+  for (const log of sorted) {
+    const res = scheduleCard(state, log.rating, log.reviewedAt, config);
+    state = res.next;
+    state.userId = log.userId;
+    state.cardId = log.cardId;
+  }
+
+  return state;
+}
+
+/**
+ * Format interval in days into a human-readable badge (e.g., '<1m', '10m', '1d', '3d', '2.5mo')
+ */
+export function formatInterval(days: number): string {
+  if (days <= 0) return '<1m';
+  const minutes = days * 24 * 60;
+  if (minutes < 1.5) return '<1m';
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = days * 24;
+  if (hours < 24) return `${Math.round(hours)}h`;
+  if (days < 30) return `${Math.round(days)}d`;
+  if (days < 365) return `${(days / 30).toFixed(1)}mo`;
+  return `${(days / 365).toFixed(1)}y`;
+}
+
+export interface IntervalPreview {
+  rating: Rating;
+  label: 'Again' | 'Hard' | 'Good' | 'Easy';
+  intervalDays: number;
+  formatted: string;
+  nextDue: Date;
+}
+
+const RATING_LABELS: Record<Rating, 'Again' | 'Hard' | 'Good' | 'Easy'> = {
+  1: 'Again',
+  2: 'Hard',
+  3: 'Good',
+  4: 'Easy',
+};
+
+/**
+ * Calculate predicted next intervals for all 4 ratings without modifying state
+ */
+export function previewIntervals(
+  currentState: CardState | null,
+  now: Date,
+  optionsOrConfig: FSRSConfig | ScheduleOptions = DEFAULT_FSRS_CONFIG
+): IntervalPreview[] {
+  const ratings: Rating[] = [1, 2, 3, 4];
+  return ratings.map((rating) => {
+    const { next, log } = scheduleCard(currentState, rating, now, optionsOrConfig);
+    return {
+      rating,
+      label: RATING_LABELS[rating],
+      intervalDays: log.scheduledDays,
+      formatted: formatInterval(log.scheduledDays),
+      nextDue: next.due,
+    };
+  });
 }

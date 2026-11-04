@@ -1,15 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@chizmo/core": ["../../packages/core/src/index.ts"],
-      "@chizmo/db": ["../../packages/db/src/index.ts"],
-      "@chizmo/ai": ["../../packages/ai/src/index.ts"]
+      "@/*": ["./src/*"]
     },
     "plugins": [
       {

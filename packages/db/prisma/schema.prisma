@@ -200,6 +200,7 @@ model Deck {
   folderId     String?
   forkedFromId String?
   sourceId     String?
+  examDate     DateTime?
   tags         String[]      @default([])
   color        String?       @default("#6366F1")
   icon         String?       @default("sparkles")

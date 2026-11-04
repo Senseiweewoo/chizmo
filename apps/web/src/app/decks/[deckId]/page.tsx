@@ -15,6 +15,11 @@ import {
   HelpCircle,
   X,
   Sparkles,
+  Calendar,
+  AlertTriangle,
+  Flame,
+  CheckCircle2,
+  TrendingUp,
 } from 'lucide-react';
 
 interface Flashcard {
@@ -35,7 +40,15 @@ interface DeckDetail {
   tags: string[];
   cardCount: number;
   dueToday: number;
+  examDate?: string | null;
   cards: Flashcard[];
+}
+
+interface LeechCard {
+  card: Flashcard;
+  deckTitle: string;
+  lapses: number;
+  suggestion: string;
 }
 
 export default function DeckDetailPage({ params }: { params: Promise<{ deckId: string }> }) {
@@ -45,6 +58,15 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
   const [deck, setDeck] = useState<DeckDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
+
+  // Exam mode state
+  const [examDateInput, setExamDateInput] = useState('');
+  const [examPace, setExamPace] = useState<any>(null);
+  const [readiness, setReadiness] = useState<number>(0);
+  const [savingExam, setSavingExam] = useState(false);
+
+  // Leech cards state
+  const [leeches, setLeeches] = useState<LeechCard[]>([]);
 
   // New card form state
   const [front, setFront] = useState('');
@@ -59,10 +81,58 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
       .then((data) => {
         if (data.success && data.deck) {
           setDeck(data.deck);
+          if (data.deck.examDate) {
+            setExamDateInput(new Date(data.deck.examDate).toISOString().slice(0, 10));
+          }
         }
       })
       .finally(() => setLoading(false));
+
+    // Fetch study queue to get current exam pace & readiness
+    fetch(`/api/study/${deckId}/queue`)
+      .then((res) => res.json())
+      .then((qData) => {
+        if (qData.success) {
+          setExamPace(qData.examPace);
+          setReadiness(qData.readiness || 0);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch leeches for this deck
+    fetch(`/api/study/leeches?deckId=${deckId}`)
+      .then((res) => res.json())
+      .then((lData) => {
+        if (lData.success && lData.leeches) {
+          setLeeches(lData.leeches);
+        }
+      })
+      .catch(() => {});
   }, [deckId]);
+
+  const handleSaveExamDate = async () => {
+    setSavingExam(true);
+    try {
+      const res = await fetch('/api/study/exam-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deckId,
+          examDate: examDateInput ? new Date(examDateInput).toISOString() : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setExamPace(data.examPace);
+        setReadiness(data.readiness || 0);
+        if (deck) {
+          setDeck({ ...deck, examDate: examDateInput || null });
+        }
+      }
+    } finally {
+      setSavingExam(false);
+    }
+  };
 
   const handleAddCard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +177,7 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
         cardCount: Math.max(0, deck.cardCount - 1),
         cards: deck.cards.filter((c) => c.id !== cardId),
       });
+      setLeeches((prev) => prev.filter((l) => l.card.id !== cardId));
     }
   };
 
@@ -140,8 +211,11 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
     );
   }
 
+  const daysToExam = examPace?.daysRemaining;
+  const isFinalWeek = daysToExam !== undefined && daysToExam <= 7 && daysToExam > 0;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-200">
       {/* Back button */}
       <Link
         href="/library"
@@ -196,9 +270,125 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
 
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
           <span>{deck.cards.length} cards total</span>
-          <span className="font-semibold text-emerald-600">Active FSRS Engine</span>
+          <span className="font-semibold text-emerald-600">Active FSRS-4.5 Engine</span>
         </div>
       </Card>
+
+      {/* Exam Mode & Retention Projection Widget */}
+      <Card className="p-6 bg-gradient-to-br from-slate-50 to-indigo-50/40 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-chizmo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-chizmo-600/20">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                Exam Mode Target
+                {isFinalWeek && (
+                  <Badge variant="volt" className="text-[10px]">
+                    Final Week Surge (96% Target) ⚡
+                  </Badge>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                FSRS dynamically calibrates daily pacing to guarantee peak retention on your target date.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={examDateInput}
+              onChange={(e) => setExamDateInput(e.target.value)}
+              className="px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+            />
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleSaveExamDate}
+              disabled={savingExam}
+            >
+              {savingExam ? 'Saving...' : 'Set Date'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Readiness and Pace Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-sm flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-lg font-black text-slate-900 dark:text-white">
+                {readiness}%
+              </div>
+              <div className="text-[11px] text-slate-500">Projected Retention</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-sm flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-chizmo-100 dark:bg-chizmo-950/60 text-chizmo-600 dark:text-chizmo-400 flex items-center justify-center shrink-0">
+              <Flame className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-lg font-black text-slate-900 dark:text-white">
+                {examPace?.requiredNewPerDay ?? '—'} / day
+              </div>
+              <div className="text-[11px] text-slate-500">Target New Cards Pace</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-sm flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-volt-100 dark:bg-volt-950/60 text-volt-600 dark:text-volt-400 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-lg font-black text-slate-900 dark:text-white">
+                {daysToExam ? `${daysToExam} days` : 'Not Set'}
+              </div>
+              <div className="text-[11px] text-slate-500">Days to Exam</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Leech Cards Warning (lapses >= 8) */}
+      {leeches.length > 0 && (
+        <Card className="p-5 border-2 border-amber-300 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-sm">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <span>Tricky Concept Alert ({leeches.length} Leech Cards Detected)</span>
+          </div>
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            FSRS detected cards you have lapsed on 8+ times. Learning science recommends rewriting or splitting these into smaller atomic facts to unblock memory retention:
+          </p>
+
+          <div className="space-y-2 pt-1">
+            {leeches.map((leech) => (
+              <div
+                key={leech.card.id}
+                className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    {leech.card.front}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    💡 <em>{leech.suggestion}</em>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                  <Badge variant="volt" className="text-[10px]">
+                    {leech.lapses} lapses
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Cards List Header */}
       <div className="flex items-center justify-between">
@@ -222,43 +412,49 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
           </Card>
         ) : (
           deck.cards.map((card, idx) => (
-            <Card key={card.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <Card
+              key={card.id}
+              className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+            >
               <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
-                  {card.hint && (
-                    <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                      <HelpCircle className="w-3 h-3" /> Hint included
-                    </span>
+                  <span className="text-[11px] font-bold text-slate-400">#{idx + 1}</span>
+                  {card.tags && card.tags.length > 0 && (
+                    <div className="flex gap-1">
+                      {card.tags.map((t) => (
+                        <span key={t} className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                <div className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white">
+                <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
                   {card.front}
                 </div>
 
-                <div className="text-sm text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-xs font-bold text-chizmo-600 dark:text-chizmo-400 mr-1.5 uppercase">
-                    Answer:
-                  </span>
+                <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 pl-3 border-l-2 border-emerald-500">
                   {card.back}
                 </div>
 
-                {card.explanation && (
-                  <div className="text-xs text-slate-400 italic">
-                    {card.explanation}
+                {card.hint && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 pl-3">
+                    💡 Hint: {card.hint}
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-1 self-end sm:self-start">
-                <button
+              <div className="flex items-center gap-1 self-end sm:self-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleDeleteCard(card.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
-                  title="Delete Card"
+                  className="text-slate-400 hover:text-red-500"
+                  title="Delete card"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </Card>
           ))
@@ -267,85 +463,95 @@ export default function DeckDetailPage({ params }: { params: Promise<{ deckId: s
 
       {/* Add Card Modal */}
       {showAddCardModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
-          <Card className="w-full max-w-lg space-y-5 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowAddCardModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Add Flashcard</h2>
-              <p className="text-xs text-slate-500">Atomic, self-contained questions produce maximum retention.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Add Flashcard
+              </h3>
+              <button
+                onClick={() => setShowAddCardModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <form onSubmit={handleAddCard} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Front (Question / Prompt) *
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Front (Prompt or Question) *
                 </label>
                 <textarea
-                  rows={2}
                   required
+                  rows={2}
                   value={front}
                   onChange={(e) => setFront(e.target.value)}
-                  placeholder="e.g. Where does the Krebs cycle take place in eukaryotic cells?"
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-obsidian-950 text-sm focus:outline-none focus:ring-2 focus:ring-chizmo-500 text-slate-900 dark:text-white resize-none"
+                  placeholder="e.g. What is the primary function of ribosomes?"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-chizmo-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Back (Direct Answer) *
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Back (Target Fact or Answer) *
                 </label>
                 <textarea
-                  rows={2}
                   required
+                  rows={2}
                   value={back}
                   onChange={(e) => setBack(e.target.value)}
-                  placeholder="e.g. Mitochondrial matrix."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-obsidian-950 text-sm focus:outline-none focus:ring-2 focus:ring-chizmo-500 text-slate-900 dark:text-white resize-none"
+                  placeholder="e.g. Protein synthesis (translation of mRNA into polypeptides)."
+                  className="w-full px-3.5 py-2.5 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-chizmo-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Hint (Optional)
                 </label>
                 <input
                   type="text"
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
-                  placeholder="e.g. Inside the inner membrane"
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-obsidian-950 text-sm focus:outline-none focus:ring-2 focus:ring-chizmo-500 text-slate-900 dark:text-white"
+                  placeholder="e.g. Cellular protein factory"
+                  className="w-full px-3.5 py-2 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-chizmo-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Explanation / Context (Optional)
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Explanation (Optional)
                 </label>
-                <textarea
-                  rows={2}
+                <input
+                  type="text"
                   value={explanation}
                   onChange={(e) => setExplanation(e.target.value)}
-                  placeholder="Additional context shown after answering..."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-obsidian-950 text-sm focus:outline-none focus:ring-2 focus:ring-chizmo-500 text-slate-900 dark:text-white resize-none"
+                  placeholder="e.g. Reads codons and links corresponding amino acids via peptide bonds."
+                  className="w-full px-3.5 py-2 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-chizmo-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="ghost" onClick={() => setShowAddCardModal(false)}>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowAddCardModal(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary" isLoading={isSubmitting}>
-                  Save Card
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="flex-1"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Add Card'}
                 </Button>
               </div>
             </form>
-          </Card>
+          </div>
         </div>
       )}
     </div>

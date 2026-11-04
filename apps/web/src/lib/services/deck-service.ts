@@ -10,6 +10,7 @@ export interface DeckWithMeta {
   language: string;
   color: string;
   icon: string;
+  examDate?: Date | null;
   tags: string[];
   cardCount: number;
   dueToday: number;
@@ -148,6 +149,10 @@ const inMemoryDecks: DeckWithMeta[] = [
 ];
 
 export const DeckService = {
+  async getUserDecks(userId?: string): Promise<DeckWithMeta[]> {
+    return this.getDecks(userId);
+  },
+
   async getDecks(userId?: string): Promise<DeckWithMeta[]> {
     try {
       const dbDecks = await prisma.deck.findMany({
@@ -171,6 +176,7 @@ export const DeckService = {
           language: d.language,
           color: d.color || '#6366F1',
           icon: d.icon || 'sparkles',
+          examDate: d.examDate,
           tags: d.tags,
           cardCount: d._count.cards,
           dueToday: Math.min(d._count.cards, 10),
@@ -206,6 +212,7 @@ export const DeckService = {
           language: deck.language,
           color: deck.color || '#6366F1',
           icon: deck.icon || 'sparkles',
+          examDate: deck.examDate,
           tags: deck.tags,
           cardCount: deck.cards.length,
           dueToday: deck.cards.length,
@@ -297,6 +304,7 @@ export const DeckService = {
           visibility: data.visibility as any,
           color: data.color,
           icon: data.icon,
+          examDate: data.examDate !== undefined ? data.examDate : undefined,
           tags: data.tags,
         },
       });

@@ -9,6 +9,23 @@ export interface DailyQueueConfig {
   examDate?: Date;
 }
 
+export interface DeckWithCards {
+  id: string;
+  title: string;
+  color?: string;
+  cards: Card[];
+}
+
+export interface MultiDeckQueueResult {
+  queue: Array<QueueItem & { deckTitle: string; deckColor: string }>;
+  totalDueCount: number;
+  totalNewCount: number;
+  overdueCount: number;
+  isCatchUpMode: boolean;
+  requiredNewPerDay: number;
+  overallReadiness: number;
+}
+
 /**
  * Deterministic pseudo-random number generator for interval fuzzing
  */
@@ -71,7 +88,7 @@ export function calculateReadiness(states: CardState[], targetDate: Date): numbe
 }
 
 /**
- * Build daily study queue with interleaving and capacity caps
+ * Build daily study queue for a single deck
  */
 export function buildDailyQueue(
   cards: Card[],
@@ -131,13 +148,12 @@ export function buildDailyQueue(
   const selectedReviews = dueReviews.slice(0, config.maxReviews);
   const selectedNew = newCards.slice(0, allowedNew);
 
-  // Interleave due reviews with new cards to maximize engagement
+  // Interleave due reviews with new cards to maximize engagement (3:1 ratio)
   const interleaved: QueueItem[] = [];
   let rIdx = 0;
   let nIdx = 0;
 
   while (rIdx < selectedReviews.length || nIdx < selectedNew.length) {
-    // Interleave ratio: 3 reviews to 1 new card
     for (let i = 0; i < 3 && rIdx < selectedReviews.length; i++) {
       interleaved.push(selectedReviews[rIdx++]);
     }
@@ -147,4 +163,147 @@ export function buildDailyQueue(
   }
 
   return interleaved;
+}
+
+/**
+ * Build unified multi-deck daily study queue
+ * Interleaves cards across multiple decks and topics so students never get stuck in blocks
+ */
+export function buildMultiDeckDailyQueue(
+  decks: DeckWithCards[],
+  states: Map<string, CardState>,
+  now: Date,
+  config: DailyQueueConfig
+): MultiDeckQueueResult {
+  const allDuePerDeck: Map<string, Array<QueueItem & { deckTitle: string; deckColor: string }>> = new Map();
+  const allNewPerDeck: Map<string, Array<QueueItem & { deckTitle: string; deckColor: string }>> = new Map();
+
+  let totalDueCount = 0;
+  let totalNewCount = 0;
+  const allStates: CardState[] = [];
+
+  for (const deck of decks) {
+    const dueForDeck: Array<QueueItem & { deckTitle: string; deckColor: string }> = [];
+    const newForDeck: Array<QueueItem & { deckTitle: string; deckColor: string }> = [];
+
+    for (const card of deck.cards) {
+      const state = states.get(card.id);
+
+      if (!state || state.state === 'NEW') {
+        const defaultState: CardState = {
+          userId: state?.userId || '',
+          cardId: card.id,
+          state: 'NEW',
+          stability: 0,
+          difficulty: 5.0,
+          due: now,
+          reps: 0,
+          lapses: 0,
+        };
+        newForDeck.push({
+          card,
+          state: defaultState,
+          isNew: true,
+          retrievability: 0,
+          deckTitle: deck.title,
+          deckColor: deck.color || '#6366F1',
+        });
+        totalNewCount++;
+      } else {
+        allStates.push(state);
+        if (state.due <= now) {
+          const elapsedMs = Math.max(0, now.getTime() - (state.lastReview?.getTime() || now.getTime()));
+          const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+          const R = calculateRetrievability(elapsedDays, state.stability);
+          dueForDeck.push({
+            card,
+            state,
+            isNew: false,
+            retrievability: R,
+            deckTitle: deck.title,
+            deckColor: deck.color || '#6366F1',
+          });
+          totalDueCount++;
+        }
+      }
+    }
+
+    // Sort due cards in deck by retrievability
+    dueForDeck.sort((a, b) => a.retrievability - b.retrievability);
+    allDuePerDeck.set(deck.id, dueForDeck);
+    allNewPerDeck.set(deck.id, newForDeck);
+  }
+
+  // Interleave across decks (round-robin)
+  const interleavedDue: Array<QueueItem & { deckTitle: string; deckColor: string }> = [];
+  const interleavedNew: Array<QueueItem & { deckTitle: string; deckColor: string }> = [];
+
+  let hasMoreDue = true;
+  while (hasMoreDue) {
+    hasMoreDue = false;
+    for (const deck of decks) {
+      const dueList = allDuePerDeck.get(deck.id);
+      if (dueList && dueList.length > 0) {
+        interleavedDue.push(dueList.shift()!);
+        if (dueList.length > 0) hasMoreDue = true;
+      }
+    }
+  }
+
+  let hasMoreNew = true;
+  while (hasMoreNew) {
+    hasMoreNew = false;
+    for (const deck of decks) {
+      const newList = allNewPerDeck.get(deck.id);
+      if (newList && newList.length > 0) {
+        interleavedNew.push(newList.shift()!);
+        if (newList.length > 0) hasMoreNew = true;
+      }
+    }
+  }
+
+  // Handle daily review limits & catch-up mode
+  const overdueCount = Math.max(0, interleavedDue.length - config.maxReviews);
+  const isCatchUpMode = overdueCount > 0;
+  const selectedDue = interleavedDue.slice(0, config.maxReviews);
+
+  let allowedNew = config.newPerDay;
+  let requiredNewPerDay = allowedNew;
+  if (config.examDate) {
+    const pace = calculateExamPace(
+      decks.reduce((sum, d) => sum + d.cards.length, 0),
+      totalNewCount,
+      now,
+      config.examDate
+    );
+    requiredNewPerDay = pace.requiredNewPerDay;
+    allowedNew = Math.max(config.newPerDay, pace.requiredNewPerDay);
+  }
+  const selectedNew = interleavedNew.slice(0, allowedNew);
+
+  // Combine into final interleaved queue (3 due reviews to 1 new card)
+  const finalQueue: Array<QueueItem & { deckTitle: string; deckColor: string }> = [];
+  let dIdx = 0;
+  let nIdx = 0;
+
+  while (dIdx < selectedDue.length || nIdx < selectedNew.length) {
+    for (let i = 0; i < 3 && dIdx < selectedDue.length; i++) {
+      finalQueue.push(selectedDue[dIdx++]);
+    }
+    if (nIdx < selectedNew.length) {
+      finalQueue.push(selectedNew[nIdx++]);
+    }
+  }
+
+  const overallReadiness = calculateReadiness(allStates, config.examDate || now);
+
+  return {
+    queue: finalQueue,
+    totalDueCount,
+    totalNewCount,
+    overdueCount,
+    isCatchUpMode,
+    requiredNewPerDay,
+    overallReadiness,
+  };
 }

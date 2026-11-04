@@ -38,12 +38,22 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
 
   const [deckTitle, setDeckTitle] = useState('Study Session');
   const [deckColor, setDeckColor] = useState('#6366F1');
+  const [examDate, setExamDate] = useState<string | null>(null);
+  const [examPace, setExamPace] = useState<any>(null);
   const [queue, setQueue] = useState<StudyItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isNoviceMode, setIsNoviceMode] = useState(false); // 2-button vs 4-button mode
   const [showHint, setShowHint] = useState(false);
+
+  // Dynamic interval previews for ratings 1-4
+  const [previews, setPreviews] = useState<Array<{ rating: number; label: string; formatted: string }>>([
+    { rating: 1, label: 'Again', formatted: '<1m' },
+    { rating: 2, label: 'Hard', formatted: '1d' },
+    { rating: 3, label: 'Good', formatted: '3d' },
+    { rating: 4, label: 'Easy', formatted: '7d' },
+  ]);
 
   // Session analytics
   const [sessionStartedAt] = useState<number>(Date.now());
@@ -63,6 +73,8 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
         if (data.success && data.items) {
           setDeckTitle(data.deckTitle || 'Study Session');
           setDeckColor(data.deckColor || '#6366F1');
+          setExamDate(data.examDate || null);
+          setExamPace(data.examPace || null);
           setQueue(data.items);
         }
       })
@@ -70,6 +82,21 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
   }, [deckId]);
 
   const currentItem = queue[currentIndex];
+
+  // Fetch interval previews when current card changes
+  useEffect(() => {
+    if (currentItem?.card?.id) {
+      const examParam = examDate ? `&examDate=${encodeURIComponent(examDate)}` : '';
+      fetch(`/api/study/preview-intervals?cardId=${currentItem.card.id}${examParam}`)
+        .then((res) => res.json())
+        .then((pData) => {
+          if (pData.success && pData.previews) {
+            setPreviews(pData.previews);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentItem?.card?.id, examDate]);
   const isComplete = !loading && (queue.length === 0 || currentIndex >= queue.length);
 
   // Trigger celebration confetti on session completion
@@ -423,7 +450,9 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-bold text-xs sm:text-sm active:scale-95 transition-all shadow-sm"
             >
               <span>Again</span>
-              <span className="text-[10px] text-red-400 font-semibold mt-0.5">&lt;1m [1]</span>
+              <span className="text-[10px] text-red-400 font-semibold mt-0.5">
+                {previews[0]?.formatted || '<1m'} [1]
+              </span>
             </button>
 
             <button
@@ -431,7 +460,9 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 font-bold text-xs sm:text-sm active:scale-95 transition-all shadow-sm"
             >
               <span>Hard</span>
-              <span className="text-[10px] text-amber-400 font-semibold mt-0.5">1d [2]</span>
+              <span className="text-[10px] text-amber-400 font-semibold mt-0.5">
+                {previews[1]?.formatted || '1d'} [2]
+              </span>
             </button>
 
             <button
@@ -439,7 +470,9 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-bold text-xs sm:text-sm active:scale-95 transition-all shadow-sm"
             >
               <span>Good</span>
-              <span className="text-[10px] text-indigo-400 font-semibold mt-0.5">3d [3]</span>
+              <span className="text-[10px] text-indigo-400 font-semibold mt-0.5">
+                {previews[2]?.formatted || '3d'} [3]
+              </span>
             </button>
 
             <button
@@ -447,7 +480,9 @@ export default function StudySessionPage({ params }: { params: Promise<{ deckId:
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 font-bold text-xs sm:text-sm active:scale-95 transition-all shadow-sm"
             >
               <span>Easy</span>
-              <span className="text-[10px] text-emerald-500 font-semibold mt-0.5">7d [4]</span>
+              <span className="text-[10px] text-emerald-500 font-semibold mt-0.5">
+                {previews[3]?.formatted || '7d'} [4]
+              </span>
             </button>
           </div>
         )}

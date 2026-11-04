@@ -108,16 +108,44 @@ export default function LibraryPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link href="/study/daily">
+            <Button variant="volt" className="shadow-lg shadow-volt-500/20 font-bold">
+              <Sparkles className="w-4 h-4" /> Daily Study Mix
+            </Button>
+          </Link>
           <Button onClick={() => setShowCreateModal(true)} variant="primary" className="shadow-md">
             <Plus className="w-4 h-4" /> New Deck
           </Button>
           <Link href="/create">
-            <Button variant="volt">
-              <Sparkles className="w-4 h-4" /> AI Generator
+            <Button variant="outline">
+              <Sparkles className="w-4 h-4 text-chizmo-600" /> AI Generator
             </Button>
           </Link>
         </div>
       </div>
+
+      {/* Daily Study Mix Banner */}
+      <Card className="p-6 bg-gradient-to-r from-chizmo-600 via-indigo-600 to-volt-500 text-white rounded-3xl relative overflow-hidden shadow-xl shadow-chizmo-500/10">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <Badge variant="volt" className="text-[11px] font-black uppercase tracking-wider text-slate-950">
+              ⚡ FSRS Spaced Repetition Engine
+            </Badge>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+              Interleaved Daily Study Mix
+            </h2>
+            <p className="text-xs sm:text-sm text-indigo-100 max-w-xl">
+              Cognitive science proves interleaving multiple subjects outperforms blocked practice. Review today's due cards shuffled across all your decks in under 10 minutes.
+            </p>
+          </div>
+
+          <Link href="/study/daily" className="shrink-0 self-start sm:self-center">
+            <Button size="lg" className="bg-white text-slate-950 hover:bg-slate-100 font-extrabold shadow-lg">
+              Start Today's Mix <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </Card>
 
       {/* Search Bar */}
       <div className="relative max-w-md">
