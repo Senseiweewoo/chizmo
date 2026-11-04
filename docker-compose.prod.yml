@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chizmo-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chizmo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chizmo_password}
+      POSTGRES_DB: ${POSTGRES_DB:-chizmo_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - chizmo_pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chizmo_user} -d ${POSTGRES_DB:-chizmo_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: chizmo-redis-prod
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - chizmo_redisdata_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: chizmo-web-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chizmo_user}:${POSTGRES_PASSWORD:-chizmo_password}@postgres:5432/${POSTGRES_DB:-chizmo_db}
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:4001}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: chizmo-worker-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chizmo_user}:${POSTGRES_PASSWORD:-chizmo_password}@postgres:5432/${POSTGRES_DB:-chizmo_db}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  realtime:
+    build:
+      context: .
+      dockerfile: apps/realtime/Dockerfile
+    container_name: chizmo-realtime-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chizmo_user}:${POSTGRES_PASSWORD:-chizmo_password}@postgres:5432/${POSTGRES_DB:-chizmo_db}
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4001:4001"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  chizmo_pgdata_prod:
+  chizmo_redisdata_prod:
