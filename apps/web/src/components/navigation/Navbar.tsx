@@ -56,6 +56,7 @@ export function Navbar() {
     { label: 'Explore', href: '/explore', icon: Compass },
     { label: 'Analytics', href: '/analytics', icon: TrendingUp },
     { label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
+    { label: 'Pricing', href: '/pricing', icon: Zap },
     { label: 'Live Arena', href: '/live', icon: Radio },
   ];
 
