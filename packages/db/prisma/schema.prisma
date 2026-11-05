@@ -132,6 +132,7 @@ model Session {
 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([sessionToken])
+  @@index([userId])
 }
 
 model Subscription {
@@ -188,6 +189,8 @@ model DeckFolder {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   decks     Deck[]
+
+  @@index([userId])
 }
 
 model Deck {
@@ -218,6 +221,7 @@ model Deck {
   @@index([ownerId])
   @@index([visibility])
   @@index([sourceId])
+  @@index([folderId])
 }
 
 model Card {
@@ -302,6 +306,7 @@ model StudySession {
   deck          Deck      @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
   @@index([userId, startedAt])
+  @@index([deckId])
 }
 
 model Summary {
@@ -315,6 +320,9 @@ model Summary {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   source    Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([sourceId])
 }
 
 model TutorThread {
@@ -325,6 +333,8 @@ model TutorThread {
 
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  TutorMessage[]
+
+  @@index([userId])
 }
 
 model TutorMessage {
@@ -336,6 +346,8 @@ model TutorMessage {
   createdAt DateTime    @default(now())
 
   thread    TutorThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
 }
 
 model Achievement {
@@ -423,6 +435,7 @@ model LiveAnswer {
   player         LivePlayer @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@index([roomId, questionIndex])
+  @@index([playerId])
 }
 
 model Notification {
@@ -447,6 +460,8 @@ model ShareLink {
   createdAt  DateTime  @default(now())
 
   deck       Deck      @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId])
 }
 
 model Report {
@@ -457,6 +472,8 @@ model Report {
   reporterId String?
   status     String   @default("PENDING") // PENDING, REVIEWED, DISMISSED
   createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
 }
 
 model ImportJob {
@@ -471,4 +488,6 @@ model ImportJob {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
