@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/auth/session';
 import { validateSafeUrl, extractYouTubeVideoId, SourceType } from '@chizmo/core';
 import { IngestionService } from '@/lib/services/ingestion-service';
+import { logger } from '@/lib/utils/secure-logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       result: updated.result,
     });
   } catch (error: any) {
-    console.error('URL ingestion failed:', error);
+    logger.error('URL ingestion failed', { error: error.message });
     return NextResponse.json(
       { success: false, error: error.message || 'URL processing failed' },
       { status: 500 }

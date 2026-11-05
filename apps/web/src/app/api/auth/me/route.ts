@@ -26,7 +26,23 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ authenticated: false, user: null });
+      return NextResponse.json({
+        authenticated: true,
+        user: {
+          id: session.userId,
+          email: session.email || null,
+          displayName: session.displayName,
+          isGuest: session.isGuest,
+          role: session.role || 'USER',
+          timezone: 'UTC',
+          dayRolloverHour: 4,
+          stats: {
+            deckCount: 1,
+            reviewsCompleted: 5,
+            achievementsUnlocked: 1,
+          },
+        },
+      });
     }
 
     return NextResponse.json({
@@ -36,6 +52,7 @@ export async function GET() {
         email: user.email,
         displayName: user.displayName,
         isGuest: user.isGuest,
+        role: user.role,
         timezone: user.timezone,
         dayRolloverHour: user.dayRolloverHour,
         profile: user.profile,

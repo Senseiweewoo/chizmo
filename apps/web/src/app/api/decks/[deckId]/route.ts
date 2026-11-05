@@ -39,7 +39,8 @@ export async function PUT(
 
     return NextResponse.json({ success: true, deck: updated });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const status = error.message?.startsWith('Forbidden') ? 403 : 500;
+    return NextResponse.json({ success: false, error: error.message }, { status });
   }
 }
 
@@ -55,6 +56,7 @@ export async function DELETE(
     const ok = await DeckService.deleteDeck(deckId, userId);
     return NextResponse.json({ success: ok });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const status = error.message?.startsWith('Forbidden') ? 403 : 500;
+    return NextResponse.json({ success: false, error: error.message }, { status });
   }
 }

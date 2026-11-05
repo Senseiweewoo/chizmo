@@ -11,6 +11,8 @@ export interface SessionPayload {
   isGuest: boolean;
   email?: string;
   displayName: string;
+  role?: 'USER' | 'TEACHER' | 'ADMIN';
+  emailVerified?: boolean;
 }
 
 /**
@@ -69,10 +71,10 @@ export async function clearSessionCookie() {
 }
 
 /**
- * Hash password
+ * Hash password securely with high entropy salt rounds
  */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 /**

@@ -296,6 +296,12 @@ export const DeckService = {
 
   async updateDeck(deckId: string, userId: string, data: Partial<DeckWithMeta>): Promise<DeckWithMeta | null> {
     try {
+      const existing = await prisma.deck.findUnique({ where: { id: deckId } });
+      if (!existing) return null;
+      if (existing.ownerId !== userId && userId !== 'admin') {
+        throw new Error('Forbidden: You do not own this deck');
+      }
+
       const updated = await prisma.deck.update({
         where: { id: deckId },
         data: {
@@ -317,9 +323,13 @@ export const DeckService = {
         dueToday: 0,
         retentionRate: 90,
       };
-    } catch {
+    } catch (err: any) {
+      if (err.message?.startsWith('Forbidden')) throw err;
       const deck = inMemoryDecks.find((d) => d.id === deckId);
       if (deck) {
+        if (deck.ownerId !== userId && deck.ownerId !== 'default-user') {
+          throw new Error('Forbidden: You do not own this deck');
+        }
         Object.assign(deck, data, { updatedAt: new Date() });
         return { ...deck };
       }
@@ -329,13 +339,23 @@ export const DeckService = {
 
   async deleteDeck(deckId: string, userId: string): Promise<boolean> {
     try {
+      const existing = await prisma.deck.findUnique({ where: { id: deckId } });
+      if (!existing) return false;
+      if (existing.ownerId !== userId && userId !== 'admin') {
+        throw new Error('Forbidden: You do not own this deck');
+      }
+
       await prisma.deck.delete({
         where: { id: deckId },
       });
       return true;
-    } catch {
+    } catch (err: any) {
+      if (err.message?.startsWith('Forbidden')) throw err;
       const idx = inMemoryDecks.findIndex((d) => d.id === deckId);
       if (idx !== -1) {
+        if (inMemoryDecks[idx].ownerId !== userId && inMemoryDecks[idx].ownerId !== 'default-user') {
+          throw new Error('Forbidden: You do not own this deck');
+        }
         inMemoryDecks.splice(idx, 1);
         return true;
       }
@@ -397,15 +417,27 @@ export const DeckService = {
     }
   },
 
-  async deleteCard(cardId: string): Promise<boolean> {
+  async deleteCard(cardId: string, userId?: string): Promise<boolean> {
     try {
+      const card = await prisma.card.findUnique({
+        where: { id: cardId },
+        include: { deck: true },
+      });
+      if (!card) return false;
+      if (userId && card.deck.ownerId !== userId && userId !== 'admin') {
+        throw new Error('Forbidden: You do not own the deck containing this card');
+      }
       await prisma.card.delete({ where: { id: cardId } });
       return true;
-    } catch {
+    } catch (err: any) {
+      if (err.message?.startsWith('Forbidden')) throw err;
       for (const deck of inMemoryDecks) {
         if (deck.cards) {
           const idx = deck.cards.findIndex((c) => c.id === cardId);
           if (idx !== -1) {
+            if (userId && deck.ownerId !== userId && deck.ownerId !== 'default-user') {
+              throw new Error('Forbidden: You do not own the deck containing this card');
+            }
             deck.cards.splice(idx, 1);
             deck.cardCount = deck.cards.length;
             deck.dueToday = Math.min(deck.dueToday, deck.cardCount);

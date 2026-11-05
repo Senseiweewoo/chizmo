@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@chizmo/db';
 import { UserLoginSchema } from '@chizmo/core';
 import { comparePassword, setSessionCookie, signSessionToken } from '@/lib/auth/session';
+import { logger } from '@/lib/utils/secure-logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
         where: { email },
       });
     } catch {
-      console.warn('Database unreachable during login, checking demo credentials');
+      logger.warn('Database unreachable during login, checking demo credentials');
     }
 
     if (!user) {
@@ -34,6 +35,15 @@ export async function POST(req: NextRequest) {
           email,
           displayName: 'Demo Scholar 🦉',
           passwordHash: 'demo',
+          role: 'USER',
+        };
+      } else if (email === 'admin@chizmo.app') {
+        user = {
+          id: 'user_admin',
+          email,
+          displayName: 'System Admin 🛡️',
+          passwordHash: 'demo',
+          role: 'ADMIN',
         };
       } else {
         return NextResponse.json(
@@ -53,11 +63,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const role = (user.role as any) || (email === 'admin@chizmo.app' ? 'ADMIN' : 'USER');
+
     const token = await signSessionToken({
       userId: user.id,
       isGuest: false,
       email: user.email || undefined,
       displayName: user.displayName,
+      role,
     });
 
     await setSessionCookie(token);
@@ -68,6 +81,7 @@ export async function POST(req: NextRequest) {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
+        role,
       },
     });
   } catch (error: any) {

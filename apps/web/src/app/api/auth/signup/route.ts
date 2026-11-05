@@ -3,6 +3,7 @@ import { prisma } from '@chizmo/db';
 import { UserSignupSchema } from '@chizmo/core';
 import { getCurrentSession, hashPassword, setSessionCookie, signSessionToken } from '@/lib/auth/session';
 import { upgradeGuestAccount } from '@/lib/auth/guest';
+import { logger } from '@/lib/utils/secure-logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       user = { id: created.id, email: created.email!, displayName: created.displayName };
     } catch (dbErr: any) {
       if (dbErr.status === 409) throw dbErr;
-      console.warn('Database unreachable, registered user in-memory session');
+      logger.warn('Database unreachable, registered user in-memory session');
     }
 
     const token = await signSessionToken({
