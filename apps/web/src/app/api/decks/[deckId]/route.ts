@@ -29,9 +29,10 @@ export async function PUT(
     const { deckId } = await params;
     const session = await getCurrentSession();
     const userId = session?.userId || 'guest-user';
+    const userRole = session?.role;
 
     const body = await req.json();
-    const updated = await DeckService.updateDeck(deckId, userId, body);
+    const updated = await DeckService.updateDeck(deckId, userId, body, userRole);
 
     if (!updated) {
       return NextResponse.json({ success: false, error: 'Deck not found' }, { status: 404 });
@@ -52,8 +53,9 @@ export async function DELETE(
     const { deckId } = await params;
     const session = await getCurrentSession();
     const userId = session?.userId || 'guest-user';
+    const userRole = session?.role;
 
-    const ok = await DeckService.deleteDeck(deckId, userId);
+    const ok = await DeckService.deleteDeck(deckId, userId, userRole);
     return NextResponse.json({ success: ok });
   } catch (error: any) {
     const status = error.message?.startsWith('Forbidden') ? 403 : 500;

@@ -10,8 +10,9 @@ export async function DELETE(
     const { cardId } = await params;
     const session = await getCurrentSession();
     const userId = session?.userId || 'guest-user';
+    const userRole = session?.role;
 
-    const ok = await DeckService.deleteCard(cardId, userId);
+    const ok = await DeckService.deleteCard(cardId, userId, userRole);
     return NextResponse.json({ success: ok });
   } catch (error: any) {
     const status = error.message?.startsWith('Forbidden') ? 403 : 500;

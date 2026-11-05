@@ -12,7 +12,7 @@ const rateLimitStore = new Map<string, RateLimitRecord>();
 
 // Periodic garbage collection to prevent memory leaks (runs every 5 minutes)
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  const timer = setInterval(() => {
     const now = Date.now();
     for (const [key, record] of rateLimitStore.entries()) {
       record.timestamps = record.timestamps.filter((ts) => now - ts < 300_000);
@@ -21,6 +21,7 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, 300_000);
+  (timer as any).unref?.();
 }
 
 export interface RateLimitResult {
@@ -98,13 +99,24 @@ export const RateLimitProfiles: Record<'AUTH' | 'AI_GENERATE' | 'INGEST' | 'STAN
  * Helper to extract client IP from Next.js request headers
  */
 export function getClientIp(req: Request): string {
+  // 1. Direct IP attached by Next.js / server framework
+  const directIp = (req as any).ip;
+  if (directIp) return directIp;
+
+  // 2. Cloudflare or Edge CDN client IP header
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+  if (cfConnectingIp) return cfConnectingIp.trim();
+
+  // 3. X-Real-IP set by trusted upstream reverse proxy
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+
+  // 4. In multi-hop X-Forwarded-For, use the rightmost IP added by the upstream reverse proxy
   const xForwardedFor = req.headers.get('x-forwarded-for');
   if (xForwardedFor) {
-    return xForwardedFor.split(',')[0].trim();
+    const ips = xForwardedFor.split(',').map((ip) => ip.trim());
+    return ips[ips.length - 1] || ips[0] || '127.0.0.1';
   }
-  const realIp = req.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp.trim();
-  }
+
   return '127.0.0.1';
 }

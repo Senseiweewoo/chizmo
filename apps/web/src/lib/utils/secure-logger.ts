@@ -60,6 +60,14 @@ export function sanitizeLogData(data: unknown, depth = 0): unknown {
     };
   }
 
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
+  if (data instanceof RegExp) {
+    return data.toString();
+  }
+
   const sanitizedObj: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
     const isSensitive = SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
@@ -75,24 +83,32 @@ export function sanitizeLogData(data: unknown, depth = 0): unknown {
   return sanitizedObj;
 }
 
+function safeStringify(data: unknown): string {
+  try {
+    return JSON.stringify(sanitizeLogData(data));
+  } catch {
+    return String(data);
+  }
+}
+
 export const logger = {
   info: (message: string, context?: unknown) => {
     if (context !== undefined) {
-      console.log(`[INFO] ${message}`, JSON.stringify(sanitizeLogData(context)));
+      console.log(`[INFO] ${message}`, safeStringify(context));
     } else {
       console.log(`[INFO] ${message}`);
     }
   },
   warn: (message: string, context?: unknown) => {
     if (context !== undefined) {
-      console.warn(`[WARN] ${message}`, JSON.stringify(sanitizeLogData(context)));
+      console.warn(`[WARN] ${message}`, safeStringify(context));
     } else {
       console.warn(`[WARN] ${message}`);
     }
   },
   error: (message: string, context?: unknown) => {
     if (context !== undefined) {
-      console.error(`[ERROR] ${message}`, JSON.stringify(sanitizeLogData(context)));
+      console.error(`[ERROR] ${message}`, safeStringify(context));
     } else {
       console.error(`[ERROR] ${message}`);
     }
@@ -100,7 +116,7 @@ export const logger = {
   debug: (message: string, context?: unknown) => {
     if (process.env.NODE_ENV !== 'production') {
       if (context !== undefined) {
-        console.debug(`[DEBUG] ${message}`, JSON.stringify(sanitizeLogData(context)));
+        console.debug(`[DEBUG] ${message}`, safeStringify(context));
       } else {
         console.debug(`[DEBUG] ${message}`);
       }

@@ -53,7 +53,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (user.passwordHash !== 'demo') {
+    if (user.passwordHash === 'demo') {
+      if (process.env.NODE_ENV === 'production' || password !== 'demo') {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email or password.' },
+          { status: 401 }
+        );
+      }
+    } else {
       const isValid = await comparePassword(password, user.passwordHash);
       if (!isValid) {
         return NextResponse.json(

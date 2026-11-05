@@ -75,4 +75,10 @@ describe('Security & Input Validation Tests', () => {
     });
     assert.strictEqual(validDeck.success, true);
   });
+
+  it('5. User login schema requires non-empty email and password', () => {
+    assert.strictEqual(UserLoginSchema.safeParse({ email: '', password: '' }).success, false);
+    assert.strictEqual(UserLoginSchema.safeParse({ email: 'notanemail', password: '123' }).success, false);
+    assert.strictEqual(UserLoginSchema.safeParse({ email: 'scholar@chizmo.app', password: 'demo' }).success, true);
+  });
 });

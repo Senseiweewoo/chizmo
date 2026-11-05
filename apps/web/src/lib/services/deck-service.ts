@@ -294,11 +294,13 @@ export const DeckService = {
     }
   },
 
-  async updateDeck(deckId: string, userId: string, data: Partial<DeckWithMeta>): Promise<DeckWithMeta | null> {
+  async updateDeck(deckId: string, userId: string, data: Partial<DeckWithMeta>, userRole?: string): Promise<DeckWithMeta | null> {
     try {
       const existing = await prisma.deck.findUnique({ where: { id: deckId } });
       if (!existing) return null;
-      if (existing.ownerId !== userId && userId !== 'admin') {
+      const isOwner = existing.ownerId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      if (!isOwner && !isAdmin) {
         throw new Error('Forbidden: You do not own this deck');
       }
 
@@ -327,7 +329,9 @@ export const DeckService = {
       if (err.message?.startsWith('Forbidden')) throw err;
       const deck = inMemoryDecks.find((d) => d.id === deckId);
       if (deck) {
-        if (deck.ownerId !== userId && deck.ownerId !== 'default-user') {
+        const isOwner = deck.ownerId === userId || deck.ownerId === 'default-user';
+        const isAdmin = userRole === 'ADMIN';
+        if (!isOwner && !isAdmin) {
           throw new Error('Forbidden: You do not own this deck');
         }
         Object.assign(deck, data, { updatedAt: new Date() });
@@ -337,11 +341,13 @@ export const DeckService = {
     }
   },
 
-  async deleteDeck(deckId: string, userId: string): Promise<boolean> {
+  async deleteDeck(deckId: string, userId: string, userRole?: string): Promise<boolean> {
     try {
       const existing = await prisma.deck.findUnique({ where: { id: deckId } });
       if (!existing) return false;
-      if (existing.ownerId !== userId && userId !== 'admin') {
+      const isOwner = existing.ownerId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      if (!isOwner && !isAdmin) {
         throw new Error('Forbidden: You do not own this deck');
       }
 
@@ -353,7 +359,9 @@ export const DeckService = {
       if (err.message?.startsWith('Forbidden')) throw err;
       const idx = inMemoryDecks.findIndex((d) => d.id === deckId);
       if (idx !== -1) {
-        if (inMemoryDecks[idx].ownerId !== userId && inMemoryDecks[idx].ownerId !== 'default-user') {
+        const isOwner = inMemoryDecks[idx].ownerId === userId || inMemoryDecks[idx].ownerId === 'default-user';
+        const isAdmin = userRole === 'ADMIN';
+        if (!isOwner && !isAdmin) {
           throw new Error('Forbidden: You do not own this deck');
         }
         inMemoryDecks.splice(idx, 1);
@@ -417,15 +425,19 @@ export const DeckService = {
     }
   },
 
-  async deleteCard(cardId: string, userId?: string): Promise<boolean> {
+  async deleteCard(cardId: string, userId?: string, userRole?: string): Promise<boolean> {
     try {
       const card = await prisma.card.findUnique({
         where: { id: cardId },
         include: { deck: true },
       });
       if (!card) return false;
-      if (userId && card.deck.ownerId !== userId && userId !== 'admin') {
-        throw new Error('Forbidden: You do not own the deck containing this card');
+      if (userId) {
+        const isOwner = card.deck.ownerId === userId;
+        const isAdmin = userRole === 'ADMIN';
+        if (!isOwner && !isAdmin) {
+          throw new Error('Forbidden: You do not own the deck containing this card');
+        }
       }
       await prisma.card.delete({ where: { id: cardId } });
       return true;
@@ -435,8 +447,12 @@ export const DeckService = {
         if (deck.cards) {
           const idx = deck.cards.findIndex((c) => c.id === cardId);
           if (idx !== -1) {
-            if (userId && deck.ownerId !== userId && deck.ownerId !== 'default-user') {
-              throw new Error('Forbidden: You do not own the deck containing this card');
+            if (userId) {
+              const isOwner = deck.ownerId === userId || deck.ownerId === 'default-user';
+              const isAdmin = userRole === 'ADMIN';
+              if (!isOwner && !isAdmin) {
+                throw new Error('Forbidden: You do not own the deck containing this card');
+              }
             }
             deck.cards.splice(idx, 1);
             deck.cardCount = deck.cards.length;

@@ -70,7 +70,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const secret = STRIPE_WEBHOOK_SECRET || 'whsec_dummy_placeholder_for_dev_environments_only_32_chars';
+    const secret = STRIPE_WEBHOOK_SECRET;
+    if (!secret) {
+      logger.error('STRIPE_WEBHOOK_SECRET is not configured on the server');
+      return NextResponse.json(
+        { success: false, error: 'Webhook service misconfigured' },
+        { status: 500 }
+      );
+    }
     const isValid = verifyStripeSignature(rawBody, signature, secret);
 
     if (!isValid) {
