@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { prisma } from '@chizmo/db';
-import { getAIClient } from '@chizmo/ai';
+import { getAIClient, runCardGenerationPipeline, MockAIProvider } from '@chizmo/ai';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -11,44 +11,144 @@ export interface IngestionJobData {
   userId: string;
   type: string;
   content: string;
-  settings?: any;
+  settings?: {
+    deckId?: string;
+    title?: string;
+    targetExam?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    cardTypes?: Array<'basic' | 'cloze' | 'mcq' | 'write'>;
+  };
 }
 
-// Ingestion Worker Queue
+/**
+ * BullMQ Content Ingestion & AI Generation Worker
+ * Strict State Machine: PENDING -> EXTRACTING -> GENERATING -> READY (or FAILED)
+ */
 export const ingestionWorker = new Worker<IngestionJobData>(
   'content-ingestion',
   async (job: Job<IngestionJobData>) => {
-    const { sourceId, content } = job.data;
-    console.log(`[Worker] Processing ingestion job: ${job.id} for source ${sourceId}`);
+    const { sourceId, userId, content, type, settings } = job.data;
+    console.log(`[Worker] Processing ingestion job: ${job.id} for source ${sourceId} (user: ${userId})`);
 
-    // Update state to EXTRACTING
-    await prisma.source.update({
-      where: { id: sourceId },
-      data: { status: 'EXTRACTING' },
-    });
+    try {
+      // 1. Update status to EXTRACTING
+      await prisma.source.update({
+        where: { id: sourceId },
+        data: { status: 'EXTRACTING' },
+      });
 
-    // Generate Cards
-    await prisma.source.update({
-      where: { id: sourceId },
-      data: { status: 'GENERATING' },
-    });
+      // 2. Update status to GENERATING
+      await prisma.source.update({
+        where: { id: sourceId },
+        data: { status: 'GENERATING' },
+      });
 
-    const ai = getAIClient();
-    const result = await ai.generateFlashcards({
-      content,
-      sourceType: 'TEXT',
-    });
+      // 3. Run AI Content Generation & Quality Pipeline
+      // (Chunking -> Generation -> Zod Validation -> Critic Pass -> Grounding -> Dedupe)
+      const primaryClient = getAIClient();
+      const fallbackClient = new MockAIProvider();
 
-    // Update state to READY
-    await prisma.source.update({
-      where: { id: sourceId },
-      data: {
-        status: 'READY',
-        extractedText: content,
-      },
-    });
+      const pipelineResult = await runCardGenerationPipeline(
+        content,
+        {
+          content,
+          sourceType: (type.toUpperCase() === 'TOPIC' ? 'TOPIC' : type.toUpperCase() === 'DOCUMENT' ? 'DOCUMENT' : 'TEXT'),
+          targetExam: settings?.targetExam,
+          difficulty: settings?.difficulty || 'medium',
+        },
+        primaryClient,
+        fallbackClient
+      );
 
-    return { cardCount: result.cards.length };
+      // 4. Resolve or create target Deck
+      let deckId = settings?.deckId;
+      if (!deckId) {
+        const title = settings?.title || pipelineResult.topicSummary.slice(0, 60) || 'AI Generated Study Deck';
+        const deck = await prisma.deck.create({
+          data: {
+            ownerId: userId,
+            sourceId,
+            title,
+            description: `Auto-generated via AI critic pipeline. Quality Score: ${pipelineResult.stats.qualityScore}% (${pipelineResult.stats.finalCount} cards)`,
+            visibility: 'PRIVATE',
+            tags: ['ai-generated', type.toLowerCase()],
+          },
+        });
+        deckId = deck.id;
+      }
+
+      // 5. Persist Cards & initialize decoupled CardState records
+      let createdCardCount = 0;
+      for (let i = 0; i < pipelineResult.cards.length; i++) {
+        const c = pipelineResult.cards[i];
+        const cardType = c.type || 'basic';
+        const difficultyEstimate = c.difficulty === 'easy' ? 3 : c.difficulty === 'hard' ? 8 : 5;
+
+        const card = await prisma.card.create({
+          data: {
+            deckId,
+            type: cardType,
+            front: c.front,
+            back: c.back,
+            choices: c.choices ? (c.choices as any) : undefined,
+            correctIndex: c.correctIndex,
+            hint: c.hint,
+            explanation: c.explanation,
+            sourceRef: c.sourceRef ? (c.sourceRef as any) : undefined,
+            tags: c.tags || [],
+            difficultyEstimate,
+            position: i,
+            createdBy: 'AI',
+          },
+        });
+
+        // Separation of Content vs. Scheduling State
+        await prisma.cardState.create({
+          data: {
+            userId,
+            cardId: card.id,
+            state: 'NEW',
+            due: new Date(),
+            stability: 0,
+            difficulty: 0,
+            reps: 0,
+            lapses: 0,
+          },
+        });
+
+        createdCardCount++;
+      }
+
+      // 6. Update Source status to READY
+      await prisma.source.update({
+        where: { id: sourceId },
+        data: {
+          status: 'READY',
+          extractedText: content,
+          error: null,
+        },
+      });
+
+      console.log(`[Worker] Successfully generated ${createdCardCount} cards for source ${sourceId}`);
+      return {
+        deckId,
+        cardCount: createdCardCount,
+        qualityScore: pipelineResult.stats.qualityScore,
+      };
+    } catch (err: any) {
+      console.error(`[Worker] Error processing source ${sourceId}:`, err);
+
+      // Record failure state with user-friendly error
+      await prisma.source.update({
+        where: { id: sourceId },
+        data: {
+          status: 'FAILED',
+          error: err?.message || 'Failed to process and generate flashcards from source material.',
+        },
+      }).catch((dbErr) => console.error(`[Worker] Failed to record error state for ${sourceId}:`, dbErr));
+
+      throw err;
+    }
   },
   {
     connection: { url: redisUrl },
